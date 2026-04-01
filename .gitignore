@@ -1,0 +1,84 @@
+# Git worktrees
+.worktrees/
+
+# Dependencies
+node_modules/
+
+# Environment Variables & Secrets — CRITICAL: Never commit credentials
+.env
+.env.local
+.env*.local
+!.env.example
+
+# Deployment docs with real credentials
+DEPLOYMENT_READY.md
+
+# Claude Code settings
+.claude/settings.local.json
+
+# Secret files
+*_SECRET.txt
+*.secret
+*.key
+*.pem
+secrets.json
+
+# AWS credentials
+.aws/
+
+# WebStorm / JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# macOS
+.DS_Store
+._*
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Temporary
+*.tmp
+*.temp
+.cache/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+!infra/lambda/*/dist/
+/build
+
+# Testing
+coverage/
+.nyc_output
+.jest-cache/
+
+# TypeScript
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Database
+*.sqlite
+*.db
+
+# Prisma generated
+/lib/generated/prisma
+
+# Serverless
+.serverless/
+.webpack/
+lambda-function.zip
