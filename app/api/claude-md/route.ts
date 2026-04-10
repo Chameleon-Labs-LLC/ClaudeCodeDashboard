@@ -3,17 +3,59 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getClaudeHome, getProjectsDir } from '@/lib/claude-home';
 
+/**
+ * Decode a Claude Code project directory name back to the real filesystem path.
+ * Encoding: drive letter + '--' for ':/' (or ':\'), single '-' for '/' or '\'.
+ * Example: 'c--Projects' → 'C:\Projects' on Windows, 'home-user-code' → '/home/user/code' on Unix.
+ */
+function decodeProjectPath(encoded: string): string {
+  // Replace '--' (drive separator) first, then single '-' (path separator)
+  const decoded = encoded.replace(/--/, ':/').replace(/-/g, '/');
+  return path.resolve(decoded);
+}
+
+// Directories to skip when searching for CLAUDE.md files
+const SKIP_DIRS = new Set([
+  'node_modules', '.git', '.svn', 'bin', 'obj', 'packages',
+  'dist', 'build', '.next', '.nuget', 'TestResults',
+]);
+
+/**
+ * Recursively find all CLAUDE.md files under a directory, up to maxDepth levels.
+ */
+async function findClaudeMdFiles(dir: string, maxDepth: number): Promise<string[]> {
+  const results: string[] = [];
+
+  async function walk(current: string, depth: number) {
+    if (depth > maxDepth) return;
+    let entries;
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name === 'CLAUDE.md') {
+        results.push(path.join(current, entry.name));
+      } else if (entry.isDirectory() && !SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')) {
+        await walk(path.join(current, entry.name), depth + 1);
+      }
+    }
+  }
+
+  await walk(dir, 0);
+  return results;
+}
+
 // List all CLAUDE.md files (global + per-project)
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const project = searchParams.get('project');
 
   if (project) {
-    // Read specific project's CLAUDE.md
-    // The project's CLAUDE.md is at the actual project path, not in ~/.claude
-    // But we also have project-level CLAUDE.md in the claude projects dir
-    const claudeProjectDir = path.join(getProjectsDir(), project);
-    const claudeMdPath = path.join(claudeProjectDir, 'CLAUDE.md');
+    // Decode the project directory name to the real filesystem path
+    const realProjectPath = decodeProjectPath(project);
+    const claudeMdPath = path.join(realProjectPath, 'CLAUDE.md');
     try {
       const content = await fs.readFile(claudeMdPath, 'utf-8');
       return NextResponse.json({ path: claudeMdPath, content, project });
@@ -32,17 +74,23 @@ export async function GET(request: Request) {
     results.push({ project: null, path: globalPath, content });
   } catch { /* doesn't exist */ }
 
-  // Per-project CLAUDE.md files
+  // Per-project CLAUDE.md files — look in the actual project directories (recursively)
   const projectsDir = getProjectsDir();
   try {
     const entries = await fs.readdir(projectsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const claudeMdPath = path.join(projectsDir, entry.name, 'CLAUDE.md');
-      try {
-        const content = await fs.readFile(claudeMdPath, 'utf-8');
-        results.push({ project: entry.name, path: claudeMdPath, content });
-      } catch { /* no CLAUDE.md */ }
+      const realProjectPath = decodeProjectPath(entry.name);
+      const found = await findClaudeMdFiles(realProjectPath, 3);
+      for (const claudeMdPath of found) {
+        try {
+          const content = await fs.readFile(claudeMdPath, 'utf-8');
+          // Use relative path from project root as label for nested files
+          const relPath = path.relative(realProjectPath, claudeMdPath);
+          const label = relPath === 'CLAUDE.md' ? entry.name : `${entry.name} / ${path.dirname(relPath)}`;
+          results.push({ project: label, path: claudeMdPath, content });
+        } catch { /* unreadable */ }
+      }
     }
   } catch { /* projects dir doesn't exist */ }
 

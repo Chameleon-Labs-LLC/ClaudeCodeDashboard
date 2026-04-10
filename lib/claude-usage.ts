@@ -81,39 +81,43 @@ export async function getUsageStats(): Promise<UsageStats> {
       if (!projectDir.isDirectory()) continue;
 
       const projectPath = path.join(projectsDir, projectDir.name);
-      let sessionDirs: string[];
+      let entries: string[];
 
       try {
-        const entries = await fs.readdir(projectPath);
-        sessionDirs = entries;
+        entries = await fs.readdir(projectPath);
       } catch {
         continue;
       }
 
-      for (const sessionDir of sessionDirs) {
-        const sessionPath = path.join(projectPath, sessionDir);
+      for (const entry of entries) {
+        const entryPath = path.join(projectPath, entry);
 
-        let dirStat;
+        let entryStat;
         try {
-          dirStat = await fs.stat(sessionPath);
-        } catch {
-          continue;
-        }
-        if (!dirStat.isDirectory()) continue;
-
-        // Look for .jsonl files in the session directory
-        let files: string[];
-        try {
-          files = await fs.readdir(sessionPath);
+          entryStat = await fs.stat(entryPath);
         } catch {
           continue;
         }
 
-        for (const file of files) {
-          if (!file.endsWith('.jsonl')) continue;
+        if (entryStat.isFile() && entry.endsWith('.jsonl')) {
+          // Session .jsonl files at the project level
+          const sessionId = entry.replace('.jsonl', '');
+          await processSessionFile(entryPath, sessionId, projectDir.name, stats, dayMap);
+        } else if (entryStat.isDirectory()) {
+          // Also check for .jsonl files inside subdirectories (e.g. subagents)
+          let files: string[];
+          try {
+            files = await fs.readdir(entryPath);
+          } catch {
+            continue;
+          }
 
-          const filePath = path.join(sessionPath, file);
-          await processSessionFile(filePath, sessionDir, projectDir.name, stats, dayMap);
+          for (const file of files) {
+            if (!file.endsWith('.jsonl')) continue;
+
+            const filePath = path.join(entryPath, file);
+            await processSessionFile(filePath, entry, projectDir.name, stats, dayMap);
+          }
         }
       }
     }
