@@ -2,17 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { getClaudeHome, getProjectsDir } from '@/lib/claude-home';
-
-/**
- * Decode a Claude Code project directory name back to the real filesystem path.
- * Encoding: drive letter + '--' for ':/' (or ':\'), single '-' for '/' or '\'.
- * Example: 'c--Projects' → 'C:\Projects' on Windows, 'home-user-code' → '/home/user/code' on Unix.
- */
-function decodeProjectPath(encoded: string): string {
-  // Replace '--' (drive separator) first, then single '-' (path separator)
-  const decoded = encoded.replace(/--/, ':/').replace(/-/g, '/');
-  return path.resolve(decoded);
-}
+import { decodeClaudeProjectPath } from '@/lib/claude-project-path';
 
 // Directories to skip when searching for CLAUDE.md files
 const SKIP_DIRS = new Set([
@@ -53,8 +43,33 @@ export async function GET(request: Request) {
   const project = searchParams.get('project');
 
   if (project) {
-    // Decode the project directory name to the real filesystem path
-    const realProjectPath = decodeProjectPath(project);
+    const projectsDir = getProjectsDir();
+    const encodedProjectDir = path.resolve(projectsDir, project);
+
+    if (
+      project.includes('/') ||
+      project.includes('\\') ||
+      path.dirname(encodedProjectDir) !== path.resolve(projectsDir)
+    ) {
+      return NextResponse.json({ error: 'Invalid project name' }, { status: 400 });
+    }
+
+    try {
+      const stat = await fs.lstat(encodedProjectDir);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    let realProjectPath: string;
+    try {
+      realProjectPath = decodeClaudeProjectPath(project);
+    } catch {
+      return NextResponse.json({ error: 'Invalid project name' }, { status: 400 });
+    }
+
     const claudeMdPath = path.join(realProjectPath, 'CLAUDE.md');
     try {
       const content = await fs.readFile(claudeMdPath, 'utf-8');
@@ -65,13 +80,13 @@ export async function GET(request: Request) {
   }
 
   // List all CLAUDE.md files: global + per-project
-  const results: Array<{ project: string | null; path: string; content: string }> = [];
+  const results = new Map<string, { project: string | null; path: string; content: string }>();
 
   // Global CLAUDE.md
   const globalPath = path.join(getClaudeHome(), 'CLAUDE.md');
   try {
     const content = await fs.readFile(globalPath, 'utf-8');
-    results.push({ project: null, path: globalPath, content });
+    results.set(globalPath, { project: null, path: globalPath, content });
   } catch { /* doesn't exist */ }
 
   // Per-project CLAUDE.md files — look in the actual project directories (recursively)
@@ -79,8 +94,14 @@ export async function GET(request: Request) {
   try {
     const entries = await fs.readdir(projectsDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const realProjectPath = decodeProjectPath(entry.name);
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      let realProjectPath: string;
+      try {
+        realProjectPath = decodeClaudeProjectPath(entry.name);
+      } catch {
+        continue;
+      }
+
       const found = await findClaudeMdFiles(realProjectPath, 3);
       for (const claudeMdPath of found) {
         try {
@@ -88,13 +109,13 @@ export async function GET(request: Request) {
           // Use relative path from project root as label for nested files
           const relPath = path.relative(realProjectPath, claudeMdPath);
           const label = relPath === 'CLAUDE.md' ? entry.name : `${entry.name} / ${path.dirname(relPath)}`;
-          results.push({ project: label, path: claudeMdPath, content });
+          results.set(claudeMdPath, { project: label, path: claudeMdPath, content });
         } catch { /* unreadable */ }
       }
     }
   } catch { /* projects dir doesn't exist */ }
 
-  return NextResponse.json(results);
+  return NextResponse.json(Array.from(results.values()));
 }
 
 export async function PUT(request: Request) {

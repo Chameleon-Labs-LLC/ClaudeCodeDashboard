@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import matter from 'gray-matter';
 import { getClaudeHome, getProjectsDir } from './claude-home';
+import { decodeClaudeProjectPath } from './claude-project-path';
 import type {
   Session,
   SessionDetail,
@@ -45,12 +46,16 @@ export async function listProjects(): Promise<Project[]> {
   const projects: Project[] = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
     const projDir = path.join(projectsDir, entry.name);
     const memoryDir = path.join(projDir, 'memory');
 
-    // Decode the directory name (Claude uses path-encoded names)
-    const decodedPath = entry.name.replace(/-/g, '/');
+    let decodedPath: string;
+    try {
+      decodedPath = decodeClaudeProjectPath(entry.name);
+    } catch {
+      continue;
+    }
 
     let sessionCount = 0;
     let lastActive: string | undefined;

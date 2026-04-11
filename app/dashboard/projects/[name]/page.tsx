@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import SessionRow from '@/components/ui/session-row';
 import MemoryCard from '@/components/ui/memory-card';
+import { formatClaudeProjectName } from '@/lib/claude-project-path';
 import type { Session, MemoryEntry } from '@/types/claude';
 
 export default function ProjectDetailPage() {
@@ -33,7 +34,7 @@ export default function ProjectDetailPage() {
       <div className="mt-4 mb-6">
         <h2 className="font-heading text-2xl text-brand-cyan">{params.name}</h2>
         <p className="text-xs text-gray-500 mt-1 font-mono">
-          {params.name?.replace(/-/g, '/')}
+          {params.name ? formatClaudeProjectName(params.name) : ''}
         </p>
       </div>
 
