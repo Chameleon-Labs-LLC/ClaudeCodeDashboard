@@ -3,9 +3,10 @@ import { getSessionDetail } from '@/lib/claude-data';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { project: string; id: string } }
+  { params }: { params: Promise<{ project: string; id: string }> }
 ) {
-  const detail = await getSessionDetail(params.project, params.id);
+  const { project, id } = await params;
+  const detail = await getSessionDetail(project, id);
   if (!detail) {
     return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   }

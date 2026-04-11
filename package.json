@@ -14,7 +14,7 @@
     "fuse.js": "^7.0.0",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.400.0",
-    "next": "^14",
+    "next": "^16.2.3",
     "react": "^18",
     "react-dom": "^18",
     "react-markdown": "^10.1.0",
@@ -26,8 +26,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10",
-    "eslint": "^8",
-    "eslint-config-next": "^14",
+    "eslint": "^10.2.0",
+    "eslint-config-next": "^16.2.3",
     "postcss": "^8",
     "typescript": "^5"
   }
