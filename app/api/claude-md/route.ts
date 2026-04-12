@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
-import { getClaudeHome, getProjectsDir } from '@/lib/claude-home';
-import { decodeClaudeProjectPath } from '@/lib/claude-project-path';
+import { getClaudeHome } from '@/lib/claude-home';
+import {
+  getTrustedProjectRoots,
+  isPathWithin,
+  resolveTrustedProjectRoot,
+} from '@/lib/claude-project-roots';
 
 // Directories to skip when searching for CLAUDE.md files
 const SKIP_DIRS = new Set([
@@ -12,8 +16,14 @@ const SKIP_DIRS = new Set([
 
 /**
  * Recursively find all CLAUDE.md files under a directory, up to maxDepth levels.
+ * Any subtree whose canonical path appears in `pruneRoots` is skipped — that is how
+ * a parent project root avoids rediscovering CLAUDE.md files inside child project roots.
  */
-async function findClaudeMdFiles(dir: string, maxDepth: number): Promise<string[]> {
+async function findClaudeMdFiles(
+  dir: string,
+  maxDepth: number,
+  pruneRoots: Set<string>,
+): Promise<string[]> {
   const results: string[] = [];
 
   async function walk(current: string, depth: number) {
@@ -27,9 +37,20 @@ async function findClaudeMdFiles(dir: string, maxDepth: number): Promise<string[
     for (const entry of entries) {
       if (entry.isFile() && entry.name === 'CLAUDE.md') {
         results.push(path.join(current, entry.name));
-      } else if (entry.isDirectory() && !SKIP_DIRS.has(entry.name) && !entry.name.startsWith('.')) {
-        await walk(path.join(current, entry.name), depth + 1);
+        continue;
       }
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      if (SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+
+      const childPath = path.join(current, entry.name);
+      let realChild: string;
+      try {
+        realChild = await fs.realpath(childPath);
+      } catch {
+        continue;
+      }
+      if (pruneRoots.has(realChild)) continue;
+      await walk(childPath, depth + 1);
     }
   }
 
@@ -43,31 +64,13 @@ export async function GET(request: Request) {
   const project = searchParams.get('project');
 
   if (project) {
-    const projectsDir = getProjectsDir();
-    const encodedProjectDir = path.resolve(projectsDir, project);
-
-    if (
-      project.includes('/') ||
-      project.includes('\\') ||
-      path.dirname(encodedProjectDir) !== path.resolve(projectsDir)
-    ) {
+    if (project.includes('/') || project.includes('\\') || project.includes('\0')) {
       return NextResponse.json({ error: 'Invalid project name' }, { status: 400 });
     }
 
-    try {
-      const stat = await fs.lstat(encodedProjectDir);
-      if (!stat.isDirectory() || stat.isSymbolicLink()) {
-        return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-      }
-    } catch {
+    const realProjectPath = await resolveTrustedProjectRoot(project);
+    if (!realProjectPath) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
-
-    let realProjectPath: string;
-    try {
-      realProjectPath = decodeClaudeProjectPath(project);
-    } catch {
-      return NextResponse.json({ error: 'Invalid project name' }, { status: 400 });
     }
 
     const claudeMdPath = path.join(realProjectPath, 'CLAUDE.md');
@@ -89,31 +92,34 @@ export async function GET(request: Request) {
     results.set(globalPath, { project: null, path: globalPath, content });
   } catch { /* doesn't exist */ }
 
-  // Per-project CLAUDE.md files — look in the actual project directories (recursively)
-  const projectsDir = getProjectsDir();
-  try {
-    const entries = await fs.readdir(projectsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
-      let realProjectPath: string;
-      try {
-        realProjectPath = decodeClaudeProjectPath(entry.name);
-      } catch {
-        continue;
-      }
+  // Per-project CLAUDE.md files. Roots are trusted (cwd-derived + canonicalized) and
+  // overlapping encoded directories have already been collapsed by getTrustedProjectRoots.
+  const roots = await getTrustedProjectRoots();
+  const allRootPaths = new Set(roots.map((r) => r.realRoot));
 
-      const found = await findClaudeMdFiles(realProjectPath, 3);
-      for (const claudeMdPath of found) {
-        try {
-          const content = await fs.readFile(claudeMdPath, 'utf-8');
-          // Use relative path from project root as label for nested files
-          const relPath = path.relative(realProjectPath, claudeMdPath);
-          const label = relPath === 'CLAUDE.md' ? entry.name : `${entry.name} / ${path.dirname(relPath)}`;
-          results.set(claudeMdPath, { project: label, path: claudeMdPath, content });
-        } catch { /* unreadable */ }
+  for (const root of roots) {
+    // Prune sibling roots so e.g. /home/agent doesn't rediscover /home/agent/code/Foo's CLAUDE.md
+    const pruneRoots = new Set<string>();
+    for (const other of allRootPaths) {
+      if (other !== root.realRoot && isPathWithin(root.realRoot, other)) {
+        pruneRoots.add(other);
       }
     }
-  } catch { /* projects dir doesn't exist */ }
+
+    const found = await findClaudeMdFiles(root.realRoot, 3, pruneRoots);
+    for (const claudeMdPath of found) {
+      if (results.has(claudeMdPath)) continue;
+      try {
+        const content = await fs.readFile(claudeMdPath, 'utf-8');
+        const relPath = path.relative(root.realRoot, claudeMdPath);
+        const label =
+          relPath === 'CLAUDE.md'
+            ? root.encodedName
+            : `${root.encodedName} / ${path.dirname(relPath)}`;
+        results.set(claudeMdPath, { project: label, path: claudeMdPath, content });
+      } catch { /* unreadable */ }
+    }
+  }
 
   return NextResponse.json(Array.from(results.values()));
 }
