@@ -12,7 +12,8 @@
     "test:otel": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "setup:otel": "tsx scripts/setup-otel.ts"
+    "setup:otel": "tsx scripts/setup-otel.ts",
+    "daemon": "tsx scripts/daemon.ts"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5",
