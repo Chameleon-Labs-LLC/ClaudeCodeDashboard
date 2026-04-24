@@ -266,7 +266,6 @@ export function syncSessions(opts: SyncOpts = {}): SyncStats {
         stats.sessionsSynced++;
       } catch (err) {
         stats.errors++;
-        // eslint-disable-next-line no-console
         console.error('[sync] failed', fileAbs, err);
       }
     }
