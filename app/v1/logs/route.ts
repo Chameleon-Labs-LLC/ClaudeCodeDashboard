@@ -28,6 +28,18 @@ const INSERT_OTEL_EVENT = `
 `;
 
 export async function POST(request: Request): Promise<NextResponse<IngestResponse>> {
+  const MAX_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
+  const lenHeader = request.headers.get('content-length');
+  const len = lenHeader ? parseInt(lenHeader, 10) : 0;
+  if (len > MAX_BODY_BYTES) {
+    // Return 200 (not 413) so OTEL clients do not retry the oversized batch.
+    console.error(`[/v1/logs] Rejected payload of ${len} bytes (limit ${MAX_BODY_BYTES})`);
+    return NextResponse.json(
+      { accepted: 0, dropped: 0, error: 'payload too large' },
+      { status: 200 }
+    );
+  }
+
   let body: OtlpLogsPayload;
   try {
     body = (await request.json()) as OtlpLogsPayload;
