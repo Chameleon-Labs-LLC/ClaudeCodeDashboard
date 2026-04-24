@@ -62,18 +62,17 @@ Before starting, add to `package.json`:
 "@types/better-sqlite3": "^7.6.10"
 ```
 
-Add `daemon` script and `tsx` dev dependency:
+Add only the `daemon` script — `tsx` and `better-sqlite3` are already installed by Phase 1.
 
 ```json
 "scripts": {
   "daemon": "tsx scripts/daemon.ts"
-},
-"devDependencies": {
-  "tsx": "^4.7.0"
 }
 ```
 
-`better-sqlite3` native build on Windows requires `npm config set msvs_version 2022` if it fails — see master plan risk #1.
+<!-- Phase 5 actual: tsx@^4.21.0 and better-sqlite3@^11.10.0 already in package.json from Phase 1. Re-installing them here would risk a downgrade. Don't add them under devDependencies. -->
+
+`better-sqlite3` native build on Windows requires `npm config set msvs_version 2022` if it fails — see master plan risk #1 and `README.md` Windows troubleshooting section (already documented by Phase 1).
 
 ---
 
@@ -93,34 +92,20 @@ The daemon creates `.tmp/mission-control-queue/pids/` at startup if missing.
 
 ### A-2 — `lib/db.ts` — shared `better-sqlite3` singleton
 
-**File:** `lib/db.ts`
+**File:** `lib/db.ts` <!-- Phase 5 actual: ALREADY SHIPPED in Phase 1. Skip this step. -->
 
-Responsibilities: open (or create) the SQLite database, enable WAL mode, export `getDb()`. Safe for use in both the Next.js process (API routes) and the daemon process. Path from `CLAUDE_DB_PATH` env var, defaulting to `path.join(process.cwd(), '.tmp', 'dashboard.db')`.
+Phase 1 already shipped `lib/db.ts` with:
+- `getDb()` / `openDb()` / `_migrateAddColumn()` exports
+- WAL mode + `synchronous=NORMAL` + `foreign_keys=ON`
+- Env var `CCD_DB_PATH` (NOT `CLAUDE_DB_PATH`)
+- Default path `~/.claude/ccd/dashboard.db` via `getClaudeHome()` (NOT `process.cwd()/.tmp/`)
+- All 16 spec tables created via `CREATE TABLE IF NOT EXISTS` — including `ops_tasks`, `ops_schedules`, `ops_decisions`, `ops_inbox`. **Phase 5 does NOT need to define schema; it just populates these existing tables.**
 
-```typescript
-import Database from 'better-sqlite3';
-import path from 'path';
+This step is a no-op verification — confirm `import { getDb } from '@/lib/db'` works in your route handlers.
 
-let db: Database.Database | null = null;
+**Expected output:** `getDb()` returns the same instance within a process; `PRAGMA journal_mode` returns `wal`. Existing 14+ tests pass.
 
-export function getDb(): Database.Database {
-  if (!db) {
-    const dbPath = process.env.CLAUDE_DB_PATH
-      ?? path.join(process.cwd(), '.tmp', 'dashboard.db');
-    db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    ensureSchema(db);
-  }
-  return db;
-}
-```
-
-`ensureSchema(db)` runs all CREATE TABLE IF NOT EXISTS statements (see A-21 for the full list). This makes the DB self-initialising — Phase 1 migrations or not, the schema is always present.
-
-**Expected output:** `getDb()` returns the same instance within a process; `PRAGMA journal_mode` returns `wal`.
-
-**Commit:** `feat(db): better-sqlite3 singleton with WAL mode`
+**Commit:** none — A-2 lands no code changes.
 
 ---
 
@@ -182,7 +167,7 @@ export function listTasks(filters?: { status?: string; quadrant?: string }): Ops
 export function deleteTask(id: number): void;
 ```
 
-**Test:** `test/task-tracker.test.ts` — open two `Database` instances to the same file, both call `claimPending(id)` synchronously (better-sqlite3 is sync so they serialize through SQLite), assert exactly one returns non-null.
+**Test:** `tests/task-tracker.test.ts` — open two `Database` instances to the same file, both call `claimPending(id)` synchronously (better-sqlite3 is sync so they serialize through SQLite), assert exactly one returns non-null.
 
 **Commit:** `feat(task-tracker): atomic claim and CRUD for ops_tasks`
 
@@ -273,7 +258,7 @@ export function materializeSchedules(): number {
 }
 ```
 
-**Tests in `test/heartbeat.test.ts`:**
+**Tests in `tests/heartbeat.test.ts`:**
 1. `parseCronSimple('0 9 * * 0', new Date('2026-03-08T09:01:00'))` (Mon=0, so this is Mon 9am, one minute after 9am on a Sunday) — assert result is the next Monday 2026-03-09 at 09:00 local wall-clock time.
 2. DST case: `parseCronSimple('0 9 * * 0', new Date('2026-03-08T09:01:00-05:00'))` during US spring-forward — result must be `2026-03-09T09:00` in local time, not `2026-03-09T10:00` UTC-offset-confused.
 3. Two calls to `materializeSchedules()` within the same second on the same schedule row — exactly one `ops_tasks` row is created.
@@ -357,8 +342,12 @@ function sweepStalePids(): void {
   for (const f of files) {
     const pid = parseInt(f, 10);
     if (isNaN(pid)) continue;
+    // <!-- Phase 5 actual: process.kill(pid, 0) reliably throws ESRCH on Linux/macOS for dead PIDs.
+    //      On Windows it MAY NOT throw for dead PIDs in some Node versions. The authoritative
+    //      Windows liveness probe is `tasklist /FI "PID eq <pid>"` — used by killProcess() in B-1.
+    //      This sweep is best-effort on Windows; the kill path is the load-bearing safety. -->
     try {
-      process.kill(pid, 0); // throws if dead (ESRCH on Unix, error on Win)
+      process.kill(pid, 0); // throws ESRCH on Unix; best-effort on Windows
     } catch {
       try { fs.unlinkSync(path.join(PID_DIR, f)); } catch { /* race: already gone */ }
     }
@@ -708,7 +697,7 @@ export async function runOnce(): Promise<void> {
 }
 ```
 
-**Tests in `test/dispatcher.test.ts`:**
+**Tests in `tests/dispatcher.test.ts`:**
 1. Concurrent claim — open two `Database` instances, both call `claimPending(id)` on the same pending task. Assert exactly one returns non-null.
 2. `runOnce()` with `emergency_stop='1'` in DB — assert zero tasks are claimed (verify by checking task status remains `pending`).
 3. `sweepStalePids()` — write a file for a dead PID (use `pid=1` which cannot be sent SIGTERM by non-root; probe returns alive. Use PID 99999999 which does not exist.) Assert dead-PID files are removed and live-PID files are kept.
@@ -867,7 +856,7 @@ export async function POST() {
 }
 ```
 
-**Tests in `test/emergency-stop.test.ts`:**
+**Tests in `tests/emergency-stop.test.ts`:**
 1. Spawn `node -e "setInterval(()=>{},9999)"`. Manually write its PID to `PID_DIR`. Call route. Assert process dead within 5s (`process.kill(pid, 0)` throws). Assert `system_state.emergency_stop='1'`. Assert `status='running'` tasks flipped to `failed`.
 2. Spawn an unrelated `node` process with NO PID file. Call route. Assert it survives.
 3. POST `/api/system/emergency-resume` → `system_state.emergency_stop='0'`.
@@ -976,8 +965,10 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getTask } from '@/lib/task-tracker';
 
-export async function POST(_: Request, { params }: { params: { id: string } }) {
-  const id = parseInt(params.id, 10);
+// <!-- Phase 5 actual: Next.js 16 dynamic-route params is a Promise — must be awaited. -->
+export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idStr } = await params;
+  const id = parseInt(idStr, 10);
   const task = getTask(id);
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (task.status !== 'awaiting_approval')
@@ -1002,8 +993,10 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getTask } from '@/lib/task-tracker';
 
-export async function POST(_: Request, { params }: { params: { id: string } }) {
-  const id = parseInt(params.id, 10);
+// <!-- Phase 5 actual: Next.js 16 dynamic-route params is a Promise — must be awaited. -->
+export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id: idStr } = await params;
+  const id = parseInt(idStr, 10);
   const task = getTask(id);
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (task.status !== 'failed')
@@ -1149,13 +1142,15 @@ Same UUID validation. Appends the message text as a line to `.tmp/mission-contro
 
 ```typescript
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export async function POST(request: Request, { params }: { params: { sid: string } }) {
-  if (!UUID_RE.test(params.sid))
+// <!-- Phase 5 actual: Next.js 16 dynamic-route params is a Promise — must be awaited. -->
+export async function POST(request: Request, { params }: { params: Promise<{ sid: string }> }) {
+  const { sid } = await params;
+  if (!UUID_RE.test(sid))
     return NextResponse.json({ error: 'Invalid session_id format' }, { status: 400 });
   const { message } = await request.json();
   if (!message?.trim())
     return NextResponse.json({ error: 'Empty message' }, { status: 400 });
-  const queueFile = path.join(process.cwd(), '.tmp', 'mission-control-queue', `${params.sid}.jsonl`);
+  const queueFile = path.join(process.cwd(), '.tmp', 'mission-control-queue', `${sid}.jsonl`);
   fs.appendFileSync(queueFile, message + '\n', 'utf-8');
   return NextResponse.json({ queued: true });
 }
@@ -1558,7 +1553,7 @@ CREATE TABLE IF NOT EXISTS activities (
 
 ## Test specifications
 
-### `test/marker-parser.test.ts`
+### `tests/marker-parser.test.ts`
 
 Full test fixture (the parser must handle this exact string):
 
@@ -1581,7 +1576,7 @@ Assert: `parseMarker` returns 3 parsed markers total (2 DECISION, 1 INBOX). The 
 
 Implementation note: the test must track `fenceState` as a shared mutable object across all calls, exactly as the dispatcher does.
 
-### `test/task-tracker.test.ts`
+### `tests/task-tracker.test.ts`
 
 - `createTask` returns a row with `status='pending'`, `consecutive_failures=0`
 - `claimPending` on a `pending` row returns the row with `status='running'`
@@ -1590,7 +1585,7 @@ Implementation note: the test must track `fenceState` as a shared mutable object
 - `completeTask` sets `status='done'`, writes `duration_ms`
 - `listTasks({ status: 'failed' })` returns only failed tasks
 
-### `test/heartbeat.test.ts`
+### `tests/heartbeat.test.ts`
 
 - `parseCronSimple('0 9 * * 0', tJust9amSunday)` returns Monday 09:00 (Mon=0 in the Python convention)
 - `parseCronSimple('0 9 * * 0', tJust9amMon)` skips to the NEXT Monday, not the same minute
@@ -1598,14 +1593,14 @@ Implementation note: the test must track `fenceState` as a shared mutable object
 - Invalid expr (`'* *'`, `'abc 9 * * 0'`) returns `null`
 - `materializeSchedules()` with one overdue schedule: called twice within 1s → exactly 1 `ops_tasks` row (BEGIN EXCLUSIVE guard)
 
-### `test/dispatcher.test.ts`
+### `tests/dispatcher.test.ts`
 
 - `sweepStalePids()` with a file for PID 99999999 → file removed
 - `sweepStalePids()` with a file for `process.pid` (current process) → file kept
 - `runOnce()` with `emergency_stop='1'` in DB → task count remains unchanged, activity row has `tasks_dispatched: 0`
 - Mock claude: use `CLAUDE_BINARY` env var override to point at a test script. Assert classic mode captures stdout and calls `completeTask`.
 
-### `test/emergency-stop.test.ts`
+### `tests/emergency-stop.test.ts`
 
 - Spawn `node -e "setInterval(()=>{},9999)"`, write PID file, POST `/api/system/emergency-stop` via route handler. Assert process dead within 5s. Assert DB flag set to `'1'`. Assert running task flipped to failed.
 - Unrelated process (no PID file) survives.
@@ -1621,8 +1616,8 @@ Implementation note: the test must track `fenceState` as a shared mutable object
 - [ ] A-2 — `lib/db.ts` singleton
 - [ ] C-10 — `types/mission-control.ts`
 - [ ] C-11 — `lib/format-time.ts`
-- [ ] A-3 — `lib/task-tracker.ts` + `test/task-tracker.test.ts`
-- [ ] A-4 — `lib/heartbeat.ts` + `test/heartbeat.test.ts`
+- [ ] A-3 — `lib/task-tracker.ts` + `tests/task-tracker.test.ts`
+- [ ] A-4 — `lib/heartbeat.ts` + `tests/heartbeat.test.ts`
 - [ ] A-5 — `lib/skill-router.ts` stub
 - [ ] `npx tsc --noEmit` passes
 - [ ] **Commit:** `feat(phase-5-cp1): data layer`
@@ -1632,8 +1627,8 @@ Implementation note: the test must track `fenceState` as a shared mutable object
 - [ ] A-1 — `.tmp` scaffold + `.gitignore` entry
 - [ ] A-6 — `lib/dispatcher.ts` (PID helpers, `sweepStalePids`, `buildEnv`, `parseMarker`, `runClassic`, `runStream`, `runOnce`)
 - [ ] A-7 — `scripts/daemon.ts` + `package.json` daemon script + tsx dev dep
-- [ ] `test/marker-parser.test.ts` — full fenced-block fixture
-- [ ] `test/dispatcher.test.ts` — claim atomicity, emergency stop, sweep
+- [ ] `tests/marker-parser.test.ts` — full fenced-block fixture
+- [ ] `tests/dispatcher.test.ts` — claim atomicity, emergency stop, sweep
 - [ ] Manual smoke test: `npm run daemon` — starts, logs tick, exits cleanly on Ctrl+C
 - [ ] `npx tsc --noEmit` passes
 - [ ] **Commit:** `feat(phase-5-cp2): dispatcher with HITL parsing`
@@ -1652,7 +1647,7 @@ Implementation note: the test must track `fenceState` as a shared mutable object
 - [ ] C-7 — `app/api/decisions/route.ts` + `[id]/answer/route.ts`
 - [ ] C-8 — `app/api/inbox/route.ts` + `[id]/read/route.ts` + `[id]/reply/route.ts`
 - [ ] C-9 — `app/api/sessions/live/[sid]/message/route.ts`
-- [ ] `test/emergency-stop.test.ts`
+- [ ] `tests/emergency-stop.test.ts`
 - [ ] Manual: `curl -X POST localhost:3000/api/tasks -d '{"title":"smoke"}' -H 'Content-Type: application/json'` returns `{"id": 1, ...}`
 - [ ] `npx tsc --noEmit` passes, `npm run lint` passes
 - [ ] **Commit:** `feat(phase-5-cp3): all API routes`
@@ -1725,11 +1720,11 @@ Implementation note: the test must track `fenceState` as a shared mutable object
 | `package.json` | Modify (add daemon script, tsx dep) |
 | `.gitignore` | Modify (add `.tmp/mission-control-queue/`) |
 | `.tmp/.gitkeep` | Create |
-| `test/task-tracker.test.ts` | Create |
-| `test/heartbeat.test.ts` | Create |
-| `test/dispatcher.test.ts` | Create |
-| `test/marker-parser.test.ts` | Create |
-| `test/emergency-stop.test.ts` | Create |
+| `tests/task-tracker.test.ts` | Create |
+| `tests/heartbeat.test.ts` | Create |
+| `tests/dispatcher.test.ts` | Create |
+| `tests/marker-parser.test.ts` | Create |
+| `tests/emergency-stop.test.ts` | Create |
 
 ---
 
