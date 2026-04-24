@@ -19,7 +19,7 @@ The reference spec is `G:\Downloads\build-your-own-dashboard-prompt.md` (Mac-spe
 | # | Phase | Plan file | Depends on | Status |
 |---|---|---|---|---|
 | 1 | Foundation — SQLite + JSONL sync | [2026-04-24-phase-1-foundation.md](2026-04-24-phase-1-foundation.md) | none | ✅ done |
-| 2 | OTEL ingest endpoints | [2026-04-24-phase-2-otel-ingest.md](2026-04-24-phase-2-otel-ingest.md) | Phase 1 | ⏳ pending |
+| 2 | OTEL ingest endpoints | [2026-04-24-phase-2-otel-ingest.md](2026-04-24-phase-2-otel-ingest.md) | Phase 1 | ✅ done |
 | 3 | Observability panels (6 high-value) | [2026-04-24-phase-3-observability-panels.md](2026-04-24-phase-3-observability-panels.md) | Phases 1+2 | ⏳ pending |
 | 4 | Live sessions + SSE firehose | [2026-04-24-phase-4-live-realtime.md](2026-04-24-phase-4-live-realtime.md) | Phase 1 | ⏳ pending |
 | 5 | Mission Control (dispatcher + scheduler + HITL) | [2026-04-24-phase-5-mission-control.md](2026-04-24-phase-5-mission-control.md) | Phase 1 | ⏳ pending |
