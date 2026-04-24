@@ -127,7 +127,7 @@ function parseLogRecord(record: OtlpLogRecord, receivedAt: string): OtelEventRow
     output_tokens:         getNumber(attrs, 'output_tokens'),
     cache_read_tokens:     getNumber(attrs, 'cache_read_tokens'),
     cache_create_tokens:   getNumber(attrs, 'cache_create_tokens'),
-    speed:                 getNumber(attrs, 'speed'),
+    speed:                 getString(attrs, 'speed'),
     error_message:         getString(attrs, 'error.message') ?? getString(attrs, 'error_message'),
     status_code:           getNumber(attrs, 'status_code'),
     attempt_count:         getNumber(attrs, 'attempt_count'),

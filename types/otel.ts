@@ -101,7 +101,7 @@ export interface OtelEventRow {
   output_tokens: number | null;
   cache_read_tokens: number | null;
   cache_create_tokens: number | null;
-  speed: number | null;
+  speed: string | null;
   error_message: string | null;
   status_code: number | null;
   attempt_count: number | null;
