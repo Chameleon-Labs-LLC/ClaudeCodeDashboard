@@ -149,9 +149,10 @@ tool_success, cost_usd, input_tokens, output_tokens, ...
 
 `live_session_state` (populated by Phase 5's Claude Code hook when installed; may be empty):
 ```
-session_id TEXT PRIMARY KEY, cwd TEXT, model TEXT, title TEXT,
-status TEXT, updated_at TEXT
+session_id TEXT PRIMARY KEY, state TEXT, current_tool TEXT, updated_at TEXT
 ```
+
+<!-- Phase 4 actual: shipped schema in lib/db.ts:189-194 has only (session_id, state, current_tool, updated_at). The earlier `cwd, model, title, status` columns the plan invented do NOT exist. `state` is a JSON blob written by the Phase 5 hook; route handlers must `JSON.parse(state)` and derive cwd/model/title/status from it, with fallback defaults. -->
 
 Phase 4 must tolerate `live_session_state` being empty — when it is, `/api/sessions/live/[id]/state` falls back to deriving state from the last line of the session's JSONL file.
 
@@ -161,13 +162,47 @@ Phase 4 must tolerate `live_session_state` being empty — when it is, `/api/ses
 
 ### Phase 4.0 — Prerequisites
 
+> <!-- Phase 4 actual: Carry-forward fix mandated by master plan Phase 1 follow-up.
+> The bucketKey separator in lib/sync-sessions.ts uses `` SOH (verified via hexdump
+> in the master-plan commit log) — that is correct, not a bug. The REAL bug is the
+> additive ON CONFLICT pattern in upsertUsage which double-counts token_usage when an
+> in-progress session is re-synced. Fix this BEFORE building live-sessions, since the
+> live-session view exposes tokenTotal to users. -->
+>
+> **Carry-forward fix:** `lib/sync-sessions.ts` `upsertUsage` adds `excluded.input_tokens`
+> on conflict. When an in-progress session's JSONL is re-synced, `parseOne` re-aggregates
+> the WHOLE FILE and the SQL adds those totals to the existing row, inflating daily totals
+> by N× over N sync ticks. Two acceptable fixes (implementer picks one and documents in
+> the commit message):
+> 1. **Per-session-per-day delta table.** Add a `session_token_usage(session_id, date,
+>    model, input_tokens, output_tokens, cache_read, cache_create)` table. `syncSessions`
+>    DELETEs by `session_id` before re-inserting. `token_usage` becomes a SUM-derived view.
+> 2. **Compute `token_usage` on read.** Drop the `upsertUsage` call entirely. Have the
+>    cache-efficiency / daily-usage panels run `SELECT date, model, SUM(input_tokens)
+>    FROM sessions GROUP BY DATE(started_at, 'localtime'), model`. Simpler but slightly
+>    slower for large fleets.
+>
+> Either way: existing `tests/lib/sync-sessions.test.ts` "skip when mtime <= synced_at"
+> test already covers the happy path; add a new test that re-syncs the same in-progress
+> session twice and asserts `token_usage.input_tokens` does NOT double.
+
+- [ ] **4.0.0** Fix the `token_usage` double-count carry-forward issue per the note above.
+  - [ ] Pick fix #1 or fix #2; document the choice in the commit message.
+  - [ ] Add a regression test under `tests/lib/sync-sessions.test.ts` that re-syncs an
+    in-progress session twice (no `result` event so `ended_at` stays NULL) and asserts
+    `SELECT input_tokens FROM token_usage WHERE date=...` is NOT doubled.
+  - [ ] Run `npm test` — Phase 1's 14 tests + the new regression test all green.
+  - [ ] Commit: `fix(phase-4): correct token_usage to not double-count in-progress re-sync`.
+
 - [ ] **4.0.1** Verify Phases 1 + 2 are complete. Run:
   ```
+  npm test
+  npm run test:otel
   npx tsc --noEmit
   npm run lint
-  npm run test -- --run
   ```
-  Expected: zero errors, zero lint warnings, vitest reports green on all existing tests.
+  <!-- Phase 4 actual: `npm test` runs Phase 1's tsx suite (14 tests). `npm run test:otel` runs Phase 2's vitest suite (11 tests). They use different runners; do NOT collapse to one command. -->
+  Expected: 14+ tsx tests pass, 11 vitest tests pass, zero tsc errors, zero lint errors.
 
 - [ ] **4.0.2** Confirm `hooks/use-auto-refresh.ts` exists. If it does, Phase 4 reuses it verbatim. If any sibling earlier in the phase queue deleted it, restore it — do **not** re-invent the visibility-aware interval logic in `live-sessions-card.tsx`.
   ```
@@ -368,7 +403,7 @@ Pure helpers. No HTTP, no SSE, no React. Unit-testable.
   ```typescript
   import { promises as fs } from 'node:fs';
   import path from 'node:path';
-  import { getClaudeHome } from '@/lib/claude-data';
+  import { getClaudeHome } from '@/lib/claude-home';
   import type { LiveSessionRow, LiveSessionState, LiveTimelineEntry } from '@/types/live';
 
   const FIVE_MIN_MS = 5 * 60 * 1000;
@@ -621,7 +656,7 @@ Pure helpers. No HTTP, no SSE, no React. Unit-testable.
   import { NextResponse } from 'next/server';
   import path from 'node:path';
   import { promises as fs } from 'node:fs';
-  import { getClaudeHome } from '@/lib/claude-data';
+  import { getClaudeHome } from '@/lib/claude-home';
   import { getDb } from '@/lib/db';
   import { deriveStateFromJsonl } from '@/lib/live-sessions';
   import type { LiveSessionState } from '@/types/live';
@@ -636,22 +671,25 @@ Pure helpers. No HTTP, no SSE, no React. Unit-testable.
     if (!UUID_RE.test(id)) return NextResponse.json({ error: 'bad id' }, { status: 400 });
 
     // 1. try live_session_state (Phase 5 hook writes this)
+    // <!-- Phase 4 actual: live_session_state schema is (session_id, state, current_tool, updated_at). `state` is a JSON blob — parse it for cwd/model/title/status. -->
     try {
       const row = getDb().prepare(
-        `SELECT session_id, cwd, model, title, status, updated_at
+        `SELECT session_id, state, current_tool, updated_at
          FROM live_session_state WHERE session_id = ?`
       ).get(id) as {
-        session_id: string; cwd: string | null; model: string | null;
-        title: string | null; status: string | null; updated_at: string | null;
+        session_id: string; state: string | null;
+        current_tool: string | null; updated_at: string | null;
       } | undefined;
 
       if (row) {
+        let parsed: Record<string, unknown> = {};
+        try { if (row.state) parsed = JSON.parse(row.state); } catch { /* keep defaults */ }
         const state: LiveSessionState = {
           sessionId: row.session_id,
-          cwd: row.cwd,
-          model: row.model,
-          title: row.title,
-          status: (row.status as LiveSessionState['status']) ?? 'unknown',
+          cwd: (parsed.cwd as string | null) ?? null,
+          model: (parsed.model as string | null) ?? null,
+          title: (parsed.title as string | null) ?? null,
+          status: ((parsed.status as LiveSessionState['status']) ?? 'unknown'),
           lastEventAt: row.updated_at,
           derivedFrom: 'live_session_state',
         };
@@ -697,7 +735,7 @@ Pure helpers. No HTTP, no SSE, no React. Unit-testable.
   import path from 'node:path';
   import os from 'node:os';
   import { promises as fs, watch as fsWatch, type FSWatcher } from 'node:fs';
-  import { getClaudeHome } from '@/lib/claude-data';
+  import { getClaudeHome } from '@/lib/claude-home';
   import { readNewLines, lineToTimelineEntry } from '@/lib/live-sessions';
   import { sseEncode, sseComment, SSE_HEADERS } from '@/lib/sse';
 
