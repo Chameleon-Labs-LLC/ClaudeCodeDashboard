@@ -90,3 +90,7 @@ lambda-function.zip
 .ccd-test-*/
 dashboard.db
 dashboard.db-*
+
+# Phase 5 — Mission Control runtime queue (keep .tmp dir via .gitkeep)
+.tmp/*
+!.tmp/.gitkeep
