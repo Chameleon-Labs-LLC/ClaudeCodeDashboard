@@ -48,6 +48,9 @@ $RECYCLE.BIN/
 logs/
 *.log
 npm-debug.log*
+# but allow the OTEL ingest route at app/v1/logs/
+!app/v1/logs/
+!app/v1/logs/**
 
 # Temporary
 *.tmp
