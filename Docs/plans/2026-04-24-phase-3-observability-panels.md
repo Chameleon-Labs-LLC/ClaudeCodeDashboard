@@ -50,11 +50,18 @@ node -e "require('better-sqlite3')"  # must not throw
 --   cache_read_tokens, cache_create_tokens
 --   PRIMARY KEY (date, model, source)
 
--- otel_events: event_name, session_id, timestamp,
---   tool_name, tool_success, tool_duration_ms, tool_error,
+-- otel_events: event_name, session_id, prompt_id, timestamp,
+--   model, tool_name, tool_success, tool_duration_ms, tool_error,
+--   cost_usd, api_duration_ms, input_tokens, output_tokens,
+--   cache_read_tokens, cache_create_tokens,
+--   speed (TEXT, categorical: 'fast'|'slow'|null — NOT a number),
 --   error_message, status_code, attempt_count,
---   mcp_server_name, mcp_tool_name,
---   hook_execution_start/complete fields, received_at
+--   skill_name, skill_source, prompt_length, decision, decision_source,
+--   request_id, tool_result_size_bytes, mcp_server_scope,
+--   plugin_name, plugin_version, marketplace_name, install_trigger,
+--   mcp_server_name, mcp_tool_name, received_at
+-- NOTE: 'hook_execution_start' and 'hook_execution_complete' are VALUES of event_name,
+--   not separate columns. Filter via WHERE event_name IN (...).
 
 -- otel_metrics: metric_name, metric_type, value, session_id, model, timestamp
 ```
@@ -65,28 +72,11 @@ node -e "require('better-sqlite3')"  # must not throw
 
 All tasks in this block are **sequential**. Each step is 2-5 minutes.
 
-### A-0: Create `lib/db.ts` accessor (if Phase 1 didn't export a singleton)
+### A-0: Verify `lib/db.ts` accessor (skip — Phase 1 already shipped this)
 
-- [ ] **Verify** that `lib/db.ts` exports `function getDb(): Database` using `better-sqlite3` in WAL mode. If the function exists, skip this step. If not, create it:
+<!-- Phase 3 actual: Phase 1 already exports getDb(), openDb(), _migrateAddColumn() from lib/db.ts. Env var is CCD_DB_PATH (NOT SQLITE_DB_PATH). DB path is ~/.claude/ccd/dashboard.db (NOT ~/.claude/dashboard.db). All 16 tables already created. This step is ALWAYS a skip — just import { getDb } from '@/lib/db' in your route handlers. -->
 
-```typescript
-// lib/db.ts
-import Database from 'better-sqlite3';
-import path from 'path';
-import os from 'os';
-
-let _db: Database.Database | null = null;
-
-export function getDb(): Database.Database {
-  if (_db) return _db;
-  const dbPath = process.env.SQLITE_DB_PATH
-    || path.join(os.homedir(), '.claude', 'dashboard.db');
-  _db = new Database(dbPath);
-  _db.pragma('journal_mode = WAL');
-  _db.pragma('foreign_keys = ON');
-  return _db;
-}
-```
+- [ ] **Verify** that `import { getDb } from '@/lib/db'` works in a route handler. The function exists; this step is a no-op confirmation.
 
 Expected output: `npx tsc --noEmit` still passes.
 
@@ -96,7 +86,7 @@ Commit: `feat(phase-3): ensure db singleton in lib/db.ts`
 
 ### A-1: Shared helper `lib/observability-helpers.ts`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\lib\observability-helpers.ts`
+- [ ] Create `lib/observability-helpers.ts`
 
 This module provides two things every observability API route needs: range-to-date-string conversion (local-time) and a percentile calculator over a sorted numeric array.
 
@@ -156,7 +146,7 @@ Commit: `feat(phase-3): add observability-helpers lib`
 
 ### A-2: API route — `GET /api/mcp`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\mcp\route.ts`
+- [ ] Create `app/api/mcp/route.ts`
 
 **SQL strategy:** Three source tiers merged client-side:
 1. `otel_events` rows where `mcp_server_name IS NOT NULL` (precise OTEL with `OTEL_LOG_TOOL_DETAILS=1`).
@@ -272,7 +262,7 @@ Commit: `feat(phase-3): GET /api/mcp list endpoint`
 
 ### A-3: API route — `GET /api/mcp/[server]/tools`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\mcp\[server]\tools\route.ts`
+- [ ] Create `app/api/mcp/[server]/tools/route.ts`
 
 ```typescript
 // app/api/mcp/[server]/tools/route.ts
@@ -280,14 +270,16 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { rangeToLocalDateCutoff, percentile, parseMcpToolName } from '@/lib/observability-helpers';
 
+// <!-- Phase 3 actual: Next.js 16 changed dynamic route params to a Promise — must be `await`ed. The old sync pattern { params: { server: string } } is a TypeScript error in strict mode. -->
 export async function GET(
   request: Request,
-  { params }: { params: { server: string } }
+  { params }: { params: Promise<{ server: string }> }
 ) {
+  const { server: rawServer } = await params;
   const { searchParams } = new URL(request.url);
   const range = searchParams.get('range');
   const cutoff = rangeToLocalDateCutoff(range);
-  const server = decodeURIComponent(params.server);
+  const server = decodeURIComponent(rawServer);
   const db = getDb();
 
   // Source 1: OTEL events with mcp_server_name + mcp_tool_name (highest fidelity)
@@ -376,7 +368,7 @@ Commit: `feat(phase-3): GET /api/mcp/[server]/tools endpoint`
 
 ### A-4: API route — `GET /api/usage/cache`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\usage\cache\route.ts`
+- [ ] Create `app/api/usage/cache/route.ts`
 
 ```typescript
 // app/api/usage/cache/route.ts
@@ -474,7 +466,7 @@ Commit: `feat(phase-3): GET /api/usage/cache endpoint`
 
 ### A-5: API route — `GET /api/sessions/outcomes`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\sessions\outcomes\route.ts`
+- [ ] Create `app/api/sessions/outcomes/route.ts`
 
 **Priority order (mutually exclusive):** `errored > rate_limited > truncated > unfinished > ok`. A session is classified by the first matching condition.
 
@@ -549,7 +541,7 @@ Commit: `feat(phase-3): GET /api/sessions/outcomes endpoint`
 
 ### A-6: API route — `GET /api/tools/latency`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\tools\latency\route.ts`
+- [ ] Create `app/api/tools/latency/route.ts`
 
 Note: this is a **new file**, not a modification of the existing `app/api/tools/route.ts` (which reads JSONL and returns call counts only). The latency route reads from the SQLite `tool_calls` table.
 
@@ -625,7 +617,7 @@ Commit: `feat(phase-3): GET /api/tools/latency endpoint`
 
 ### A-7: API route — `GET /api/hooks/activity`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\hooks\activity\route.ts`
+- [ ] Create `app/api/hooks/activity/route.ts`
 
 **Pairing logic:** For each session, maintain a FIFO queue of `hook_execution_start` timestamps keyed by `(session_id, event_name)`. When a `hook_execution_complete` arrives, pop the earliest start, compute duration (cap at 60,000 ms). Events without a matching start are counted as unpaired fires. Daily aggregation: fires per day + average paired duration per day.
 
@@ -722,7 +714,7 @@ Commit: `feat(phase-3): GET /api/hooks/activity endpoint`
 
 ### A-8: API route — `GET /api/system/pressure`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\system\pressure\route.ts`
+- [ ] Create `app/api/system/pressure/route.ts`
 
 ```typescript
 // app/api/system/pressure/route.ts
@@ -886,7 +878,7 @@ Commit: `feat(phase-3): CollapsibleSection shared component`
 
 ### A-10: Sidebar entry for `/dashboard/observability`
 
-- [ ] Edit `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\layout\sidebar.tsx`
+- [ ] Edit `components/layout/sidebar.tsx`
 
 In the `navItems` array (line 6), add the new entry **after** the `Tool Analytics` entry and before `CLAUDE.md`:
 
@@ -919,7 +911,7 @@ Commit: `feat(phase-3): add Observability nav entry to sidebar`
 
 ### A-11: TypeScript types for Phase 3
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\types\observability.ts`
+- [ ] Create `types/observability.ts`
 
 ```typescript
 // types/observability.ts
@@ -1013,7 +1005,7 @@ Commit: `feat(phase-3): observability TypeScript types`
 
 ### A-12: Page scaffold `app/dashboard/observability/page.tsx`
 
-- [ ] Create `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\dashboard\observability\page.tsx`
+- [ ] Create `app/dashboard/observability/page.tsx`
 
 This is a **client component** (data fetching happens in each panel). The page just wires the grid layout, the range selector state, and the six panels.
 
@@ -1122,13 +1114,16 @@ Commit: `feat(phase-3): block A complete — all API routes + scaffold`
 Each of the six tasks below is independent. Dispatch all six frontend agents in a single orchestrator message. Each agent replaces one stub with a full implementation. Agents must not touch each other's files.
 
 **Each panel agent receives this shared context:**
-- API response types are in `D:\Documents\Code\GitHub\ClaudeCodeDashboard\types\observability.ts`.
+- API response types are in `types/observability.ts` (import as `@/types/observability` — path alias `@/*` maps to project root per `tsconfig.json`).
 - Use `useAutoRefresh` from `hooks/use-auto-refresh.ts` with 60s interval.
 - Tailwind tokens: `brand-navy` (#0A0E27), `brand-navy-dark` (#050711), `brand-navy-light` (#1a1e3f), `brand-cyan` (#00D4FF). Status: `chameleon-red` (#F44336), `chameleon-amber` (#FFC107), `chameleon-orange` (#FF9800), `chameleon-green` (#4CAF50).
 - Card shell: `bg-brand-navy-light border border-brand-navy-light/50 rounded-xl p-5`.
 - Empty states must be instructional. Never blank, never spinner-only.
 - All loading states use `animate-pulse` skeleton divs, not text spinners.
 - No new npm packages.
+- `speed` column in `otel_events` is `TEXT` (categorical: `'fast'`|`'slow'`|`null`). Do NOT compare numerically. <!-- Phase 3 actual: confirmed string in lib/otel-parse.ts after fix commit c0520c6 -->
+- New JSX in `app/dashboard/observability/` and `components/panels/` is NOT linted (ESLint flat config in `eslint.config.mjs` is minimal; React/JSX/a11y rules only run on the allowlisted files). TypeScript strict mode IS enforced — `npx tsc --noEmit` must pass.
+- Test runners: `npm test` (Phase 1's tsx suite under `tests/`) and `npm run test:otel` (Phase 2's vitest suite under `__tests__/`) must both stay green after Phase 3 lands. Phase 3 panel components are not unit-tested — verify with `npm run dev` smoke + `curl` against the new API routes.
 
 ---
 
@@ -1136,7 +1131,7 @@ Each of the six tasks below is independent. Dispatch all six frontend agents in 
 
 **The centerpiece. More visual care than other panels.**
 
-- [ ] Replace the stub at `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\mcp-panel.tsx`:
+- [ ] Replace the stub at `components/panels/mcp-panel.tsx`:
 
 ```tsx
 // components/panels/mcp-panel.tsx
@@ -1359,7 +1354,7 @@ Commit: `feat(phase-3): MCP panel component — drill-down with per-tool latency
 
 ### B-2 `[P]`: `components/panels/cache-efficiency-card.tsx`
 
-- [ ] Replace the stub at `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\cache-efficiency-card.tsx`:
+- [ ] Replace the stub at `components/panels/cache-efficiency-card.tsx`:
 
 ```tsx
 // components/panels/cache-efficiency-card.tsx
@@ -1524,7 +1519,7 @@ Commit: `feat(phase-3): cache efficiency panel with SVG sparkline`
 
 ### B-3 `[P]`: `components/panels/session-outcomes-card.tsx`
 
-- [ ] Replace the stub at `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\session-outcomes-card.tsx`:
+- [ ] Replace the stub at `components/panels/session-outcomes-card.tsx`:
 
 ```tsx
 // components/panels/session-outcomes-card.tsx
@@ -1657,7 +1652,7 @@ Commit: `feat(phase-3): session outcomes stacked bar chart`
 
 ### B-4 `[P]`: `components/panels/tool-latency-card.tsx`
 
-- [ ] Replace the stub at `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\tool-latency-card.tsx`:
+- [ ] Replace the stub at `components/panels/tool-latency-card.tsx`:
 
 ```tsx
 // components/panels/tool-latency-card.tsx
@@ -1778,7 +1773,7 @@ Commit: `feat(phase-3): tool latency panel with p50/p95/max + error rate`
 
 ### B-5 `[P]`: `components/panels/hook-activity-card.tsx`
 
-- [ ] Replace the stub at `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\hook-activity-card.tsx`:
+- [ ] Replace the stub at `components/panels/hook-activity-card.tsx`:
 
 ```tsx
 // components/panels/hook-activity-card.tsx
@@ -1899,7 +1894,7 @@ Commit: `feat(phase-3): hook activity panel`
 
 ### B-6 `[P]`: `components/panels/pressure-panel.tsx`
 
-- [ ] Replace the stub at `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\pressure-panel.tsx`:
+- [ ] Replace the stub at `components/panels/pressure-panel.tsx`:
 
 ```tsx
 // components/panels/pressure-panel.tsx
@@ -2099,30 +2094,30 @@ Phase 3 is complete when ALL of these pass:
 
 | File | Description |
 |---|---|
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\lib\observability-helpers.ts` | `rangeToLocalDateCutoff`, `percentile`, `parseMcpToolName` utilities |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\types\observability.ts` | TypeScript types for all six panels |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\mcp\route.ts` | `GET /api/mcp` |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\mcp\[server]\tools\route.ts` | `GET /api/mcp/[server]/tools` |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\usage\cache\route.ts` | `GET /api/usage/cache` |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\sessions\outcomes\route.ts` | `GET /api/sessions/outcomes` |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\tools\latency\route.ts` | `GET /api/tools/latency` |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\hooks\activity\route.ts` | `GET /api/hooks/activity` |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\api\system\pressure\route.ts` | `GET /api/system/pressure` |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\ui\collapsible-section.tsx` | Shared CollapsibleSection (if not from Phase 1) |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\app\dashboard\observability\page.tsx` | Main observability page |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\mcp-panel.tsx` | MCP drill-down centerpiece |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\cache-efficiency-card.tsx` | Cache hit rate + sparkline |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\session-outcomes-card.tsx` | Stacked bar outcomes |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\tool-latency-card.tsx` | Tool p50/p95/max table |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\hook-activity-card.tsx` | Hook fires + duration |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\panels\pressure-panel.tsx` | Retry/compaction/error KPIs |
+| `lib/observability-helpers.ts` | `rangeToLocalDateCutoff`, `percentile`, `parseMcpToolName` utilities |
+| `types/observability.ts` | TypeScript types for all six panels |
+| `app/api/mcp/route.ts` | `GET /api/mcp` |
+| `app/api/mcp/[server]/tools/route.ts` | `GET /api/mcp/[server]/tools` |
+| `app/api/usage/cache/route.ts` | `GET /api/usage/cache` |
+| `app/api/sessions/outcomes/route.ts` | `GET /api/sessions/outcomes` |
+| `app/api/tools/latency/route.ts` | `GET /api/tools/latency` |
+| `app/api/hooks/activity/route.ts` | `GET /api/hooks/activity` |
+| `app/api/system/pressure/route.ts` | `GET /api/system/pressure` |
+| `components/ui/collapsible-section.tsx` | Shared CollapsibleSection (if not from Phase 1) |
+| `app/dashboard/observability/page.tsx` | Main observability page |
+| `components/panels/mcp-panel.tsx` | MCP drill-down centerpiece |
+| `components/panels/cache-efficiency-card.tsx` | Cache hit rate + sparkline |
+| `components/panels/session-outcomes-card.tsx` | Stacked bar outcomes |
+| `components/panels/tool-latency-card.tsx` | Tool p50/p95/max table |
+| `components/panels/hook-activity-card.tsx` | Hook fires + duration |
+| `components/panels/pressure-panel.tsx` | Retry/compaction/error KPIs |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\components\layout\sidebar.tsx` | Add `{ href: '/dashboard/observability', label: 'Observability', icon: '◎' }` to navItems |
-| `D:\Documents\Code\GitHub\ClaudeCodeDashboard\lib\db.ts` | Verify/create `getDb()` singleton (may already exist from Phase 1) |
+| `components/layout/sidebar.tsx` | Add `{ href: '/dashboard/observability', label: 'Observability', icon: '◎' }` to navItems |
+| `lib/db.ts` | Verify/create `getDb()` singleton (may already exist from Phase 1) |
 
 ---
 
