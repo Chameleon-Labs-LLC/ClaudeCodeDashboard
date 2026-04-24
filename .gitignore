@@ -91,6 +91,8 @@ lambda-function.zip
 dashboard.db
 dashboard.db-*
 
-# Phase 5 — Mission Control runtime queue (keep .tmp dir via .gitkeep)
+# Phase 5 — Mission Control runtime queue (keep .tmp dir via .gitkeep;
+# override the generic `*.tmp` pattern above so the directory is tracked)
+!.tmp/
 .tmp/*
 !.tmp/.gitkeep
