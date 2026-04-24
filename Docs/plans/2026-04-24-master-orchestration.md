@@ -16,13 +16,17 @@ The reference spec is `G:\Downloads\build-your-own-dashboard-prompt.md` (Mac-spe
 
 ## Phase index
 
-| # | Phase | Plan file | Depends on |
-|---|---|---|---|
-| 1 | Foundation — SQLite + JSONL sync | [2026-04-24-phase-1-foundation.md](2026-04-24-phase-1-foundation.md) | none |
-| 2 | OTEL ingest endpoints | [2026-04-24-phase-2-otel-ingest.md](2026-04-24-phase-2-otel-ingest.md) | Phase 1 |
-| 3 | Observability panels (6 high-value) | [2026-04-24-phase-3-observability-panels.md](2026-04-24-phase-3-observability-panels.md) | Phases 1+2 |
-| 4 | Live sessions + SSE firehose | [2026-04-24-phase-4-live-realtime.md](2026-04-24-phase-4-live-realtime.md) | Phase 1 |
-| 5 | Mission Control (dispatcher + scheduler + HITL) | [2026-04-24-phase-5-mission-control.md](2026-04-24-phase-5-mission-control.md) | Phase 1 |
+| # | Phase | Plan file | Depends on | Status |
+|---|---|---|---|---|
+| 1 | Foundation — SQLite + JSONL sync | [2026-04-24-phase-1-foundation.md](2026-04-24-phase-1-foundation.md) | none | ✅ done |
+| 2 | OTEL ingest endpoints | [2026-04-24-phase-2-otel-ingest.md](2026-04-24-phase-2-otel-ingest.md) | Phase 1 | ⏳ pending |
+| 3 | Observability panels (6 high-value) | [2026-04-24-phase-3-observability-panels.md](2026-04-24-phase-3-observability-panels.md) | Phases 1+2 | ⏳ pending |
+| 4 | Live sessions + SSE firehose | [2026-04-24-phase-4-live-realtime.md](2026-04-24-phase-4-live-realtime.md) | Phase 1 | ⏳ pending |
+| 5 | Mission Control (dispatcher + scheduler + HITL) | [2026-04-24-phase-5-mission-control.md](2026-04-24-phase-5-mission-control.md) | Phase 1 | ⏳ pending |
+
+**Phase 1 follow-up issues (carry forward into downstream phase planning):**
+- `token_usage` double-counts on in-progress session re-sync — `upsertUsage` adds delta but `parseOne` always re-aggregates from the whole file. Phase 4 (live sessions) must address this either by deriving `token_usage` from `sessions` on read, or by tracking a per-session-per-day delta table.
+- Tooling: `eslint-config-next@16.2.3` is broken on ESLint 10. `eslint.config.mjs` is a minimal flat config; React/JSX surface is ignored by lint. Re-enable when Next ships a compatible config.
 
 **Critical path:** 1 → 2 → 3. Phases 4 and 5 can run in parallel with 3 once Phase 1 is done.
 
