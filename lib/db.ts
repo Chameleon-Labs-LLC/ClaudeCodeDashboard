@@ -54,6 +54,22 @@ CREATE TABLE IF NOT EXISTS token_usage (
   PRIMARY KEY (date, model, source)
 );
 
+-- Per-session-per-day token deltas. Source of truth for token_usage aggregates.
+-- On each session sync: DELETE rows for the session, then INSERT fresh deltas.
+-- Prevents double-counting when an in-progress session is re-synced.
+CREATE TABLE IF NOT EXISTS session_token_usage (
+  session_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  model TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'ide',
+  input_tokens INTEGER DEFAULT 0,
+  output_tokens INTEGER DEFAULT 0,
+  cache_read_tokens INTEGER DEFAULT 0,
+  cache_create_tokens INTEGER DEFAULT 0,
+  PRIMARY KEY (session_id, date, model, source)
+);
+CREATE INDEX IF NOT EXISTS idx_session_token_usage_date_model ON session_token_usage(date, model, source);
+
 CREATE TABLE IF NOT EXISTS tool_calls (
   session_id TEXT NOT NULL,
   tool_use_id TEXT NOT NULL,

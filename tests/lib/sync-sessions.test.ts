@@ -103,6 +103,67 @@ test('syncSessions buckets evening-session tokens into local day (not UTC)', () 
   cleanup();
 });
 
+test('syncSessions re-sync of in-progress session does NOT double-count token_usage', () => {
+  const { home, projectsDir, cleanup } = scratchHome();
+  process.env.CLAUDE_HOME = home;
+  process.env.TZ = 'America/Los_Angeles';
+  const db = openDb(path.join(home, 'test.db'));
+
+  // In-progress session (no `result` event → ended_at stays NULL →
+  // canSkip is false → each sync re-parses the whole JSONL).
+  const inProgressPath = path.join(projectsDir, 'sess-inprog-1.jsonl');
+  const lines = [
+    JSON.stringify({
+      type: 'user',
+      sessionId: 'sess-inprog-1',
+      cwd: '/tmp/demo',
+      gitBranch: 'main',
+      timestamp: '2026-04-24T10:00:00.000Z',
+      message: { role: 'user', content: 'hi' },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      sessionId: 'sess-inprog-1',
+      timestamp: '2026-04-24T10:00:01.000Z',
+      message: {
+        role: 'assistant',
+        model: 'claude-sonnet-4-7',
+        content: [{ type: 'text', text: 'hello' }],
+        usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 5, cache_creation_input_tokens: 0 },
+      },
+    }),
+  ];
+  fs.writeFileSync(inProgressPath, lines.join('\n') + '\n');
+
+  const first = syncSessions({ db });
+  assert.equal(first.sessionsSynced, 1);
+
+  const row1 = db.prepare("SELECT input_tokens, output_tokens, cache_read_tokens FROM token_usage WHERE model='claude-sonnet-4-7'").get() as any;
+  assert.ok(row1, 'token_usage row missing after first sync');
+  assert.equal(row1.input_tokens, 100);
+  assert.equal(row1.output_tokens, 20);
+  assert.equal(row1.cache_read_tokens, 5);
+
+  // Push mtime forward so canSkip is false even if synced_at already set.
+  const future = new Date(Date.now() + 60_000);
+  fs.utimesSync(inProgressPath, future, future);
+
+  // Second sync: same file, in-progress session (ended_at NULL), so sync
+  // re-parses and re-inserts. Must NOT double-count token_usage.
+  const second = syncSessions({ db });
+  assert.equal(second.sessionsSynced, 1, 'in-progress session should re-sync');
+
+  const row2 = db.prepare("SELECT input_tokens, output_tokens, cache_read_tokens FROM token_usage WHERE model='claude-sonnet-4-7'").get() as any;
+  assert.equal(row2.input_tokens, 100, 'input_tokens must NOT double-count on re-sync');
+  assert.equal(row2.output_tokens, 20, 'output_tokens must NOT double-count on re-sync');
+  assert.equal(row2.cache_read_tokens, 5, 'cache_read_tokens must NOT double-count on re-sync');
+
+  db.close();
+  delete process.env.CLAUDE_HOME;
+  delete process.env.TZ;
+  cleanup();
+});
+
 test('syncSessions no-ops when ~/.claude/projects does not exist (fresh install)', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), '.ccd-test-'));
   process.env.CLAUDE_HOME = home; // no projects/ dir inside
