@@ -15,7 +15,7 @@ const navItems = [
   { href: '/dashboard/claude-md', label: 'CLAUDE.md', icon: '◇' },
   { href: '/dashboard/settings', label: 'Settings', icon: '⚑' },
   { href: '/dashboard/file-history', label: 'File History', icon: '◫' },
-  { href: '/dashboard/tasks', label: 'Tasks', icon: '☐' },
+  { href: '/dashboard/tasks', label: 'Mission Control', icon: '⌂' },
   { href: '/dashboard/search', label: 'Search', icon: '⌕' },
 ];
 
