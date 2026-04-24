@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import StatCard from '@/components/ui/stat-card';
 import SessionRow from '@/components/ui/session-row';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
+import { LiveSessionsCard } from '@/components/panels/live-sessions-card';
 import type { DashboardStats } from '@/types/claude';
 
 export default function DashboardOverview() {
@@ -35,6 +36,10 @@ export default function DashboardOverview() {
   return (
     <div>
       <h2 className="font-heading text-2xl text-brand-cyan mb-6">Overview</h2>
+
+      <div className="mb-8">
+        <LiveSessionsCard />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <StatCard label="Total Sessions" value={stats.totalSessions} icon="◉" />

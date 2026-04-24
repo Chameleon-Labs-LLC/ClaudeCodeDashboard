@@ -9,6 +9,7 @@ const navItems = [
   { href: '/dashboard/memory', label: 'Memory', icon: '◈' },
   { href: '/dashboard/projects', label: 'Projects', icon: '◆' },
   { href: '/dashboard/history', label: 'History', icon: '◷' },
+  { href: '/dashboard/activity', label: 'Activity', icon: '⚡' },
   { href: '/dashboard/usage', label: 'Usage & Cost', icon: '◐' },
   { href: '/dashboard/tools', label: 'Tool Analytics', icon: '⚙' },
   { href: '/dashboard/observability', label: 'Observability', icon: '◎' },

@@ -179,14 +179,13 @@ export function syncSessions(opts: SyncOpts = {}): SyncStats {
     VALUES (?, ?, ?, ?, ?, ?)
   `);
 
-  const upsertUsage = db.prepare(`
-    INSERT INTO token_usage (date, model, source, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens)
-    VALUES (?, ?, 'ide', ?, ?, ?, ?)
-    ON CONFLICT(date, model, source) DO UPDATE SET
-      input_tokens = token_usage.input_tokens + excluded.input_tokens,
-      output_tokens = token_usage.output_tokens + excluded.output_tokens,
-      cache_read_tokens = token_usage.cache_read_tokens + excluded.cache_read_tokens,
-      cache_create_tokens = token_usage.cache_create_tokens + excluded.cache_create_tokens
+  // Per-session delta tracking. Each session sync DELETEs its own rows and
+  // INSERTs fresh deltas, so re-syncing an in-progress session cannot double-count.
+  // token_usage is rebuilt from the aggregate at the end of the sync run.
+  const deleteSessionUsage = db.prepare('DELETE FROM session_token_usage WHERE session_id = ?');
+  const insertSessionUsage = db.prepare(`
+    INSERT INTO session_token_usage (session_id, date, model, source, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens)
+    VALUES (?, ?, ?, 'ide', ?, ?, ?, ?)
   `);
 
   const getSyncedAt = db.prepare('SELECT synced_at, ended_at FROM sessions WHERE session_id = ?');
@@ -235,9 +234,11 @@ export function syncSessions(opts: SyncOpts = {}): SyncStats {
       stats.toolCalls++;
     }
 
+    // Replace this session's per-day deltas wholesale. token_usage is rebuilt at end of sync.
+    deleteSessionUsage.run(acc.sessionId);
     for (const [key, b] of acc.dayModelBuckets) {
       const [day, model] = key.split('');
-      upsertUsage.run(day, model, b.input, b.output, b.cacheRead, b.cacheCreate);
+      insertSessionUsage.run(acc.sessionId, day, model, b.input, b.output, b.cacheRead, b.cacheCreate);
     }
   });
 
@@ -270,6 +271,19 @@ export function syncSessions(opts: SyncOpts = {}): SyncStats {
       }
     }
   }
+
+  // Rebuild token_usage from the per-session delta table. This is the only
+  // place token_usage is written, so re-syncing an in-progress session cannot
+  // double-count — session_token_usage DELETE+INSERT in runOne replaces that
+  // session's contribution atomically each pass.
+  db.prepare('DELETE FROM token_usage').run();
+  db.prepare(`
+    INSERT INTO token_usage (date, model, source, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens)
+    SELECT date, model, source,
+           SUM(input_tokens), SUM(output_tokens), SUM(cache_read_tokens), SUM(cache_create_tokens)
+    FROM session_token_usage
+    GROUP BY date, model, source
+  `).run();
 
   return stats;
 }
