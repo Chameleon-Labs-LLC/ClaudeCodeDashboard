@@ -82,3 +82,8 @@ next-env.d.ts
 .serverless/
 .webpack/
 lambda-function.zip
+
+# Phase 1 — SQLite cache + test scratch
+.ccd-test-*/
+dashboard.db
+dashboard.db-*
