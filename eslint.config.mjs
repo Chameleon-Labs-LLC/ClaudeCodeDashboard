@@ -30,8 +30,11 @@ export default [
       'lib/db.ts',
       'lib/local-day.ts',
       'lib/sync-sessions.ts',
+      'lib/otel-parse.ts',
       'instrumentation.ts',
+      'scripts/**/*.ts',
       'tests/**/*.ts',
+      '__tests__/**/*.ts',
     ],
     languageOptions: {
       globals: {
