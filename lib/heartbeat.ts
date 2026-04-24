@@ -57,7 +57,7 @@ export function materializeSchedules(): number {
 
   // .exclusive() maps to BEGIN EXCLUSIVE — prevents two daemon processes
   // from double-materialising the same schedule window.
-  db.transaction(() => {
+  const txn = db.transaction(() => {
     const schedules = db
       .prepare(
         `SELECT * FROM ops_schedules
@@ -81,7 +81,9 @@ export function materializeSchedules(): number {
         `UPDATE ops_schedules SET last_run_at=?, next_run_at=? WHERE id=?`,
       ).run(now.toISOString(), next?.toISOString() ?? null, sched.id);
     }
-  }).exclusive()();
+  });
+  // `txn.exclusive()` invokes the transaction under BEGIN EXCLUSIVE.
+  txn.exclusive();
 
   return created;
 }
