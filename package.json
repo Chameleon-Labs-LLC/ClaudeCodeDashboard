@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "tsx --test tests/**/*.test.ts",
+    "test:otel": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "setup:otel": "tsx scripts/setup-otel.ts"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5",
@@ -28,11 +32,13 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitest/coverage-v8": "^4.1.5",
     "autoprefixer": "^10",
     "eslint": "^10.2.0",
     "eslint-config-next": "^16.2.3",
     "postcss": "^8",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   }
 }
