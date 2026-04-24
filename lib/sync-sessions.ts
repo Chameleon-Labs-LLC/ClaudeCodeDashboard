@@ -274,3 +274,48 @@ export function syncSessions(opts: SyncOpts = {}): SyncStats {
 
   return stats;
 }
+
+// ---------------------------------------------------------------------------
+// Boot loop — HMR-safe, unref'd, runs at boot + every 120 s.
+// ---------------------------------------------------------------------------
+
+const LOOP_SYM = Symbol.for('ccd.syncStarted');
+
+interface LoopState { handle: NodeJS.Timeout; startedAt: number; }
+
+function getLoopState(): LoopState | undefined {
+  return (globalThis as any)[LOOP_SYM];
+}
+
+function setLoopState(s: LoopState) {
+  (globalThis as any)[LOOP_SYM] = s;
+}
+
+export function _syncLoopStarted(): boolean {
+  return !!getLoopState();
+}
+
+export interface StartSyncLoopOpts {
+  intervalMs?: number;
+  runNow?: boolean;
+}
+
+export function startSyncLoop(opts: StartSyncLoopOpts = {}): NodeJS.Timeout {
+  const existing = getLoopState();
+  if (existing) return existing.handle;
+
+  const intervalMs = opts.intervalMs ?? 120_000;
+  const runNow = opts.runNow ?? true;
+
+  if (runNow) {
+    try { syncSessions(); } catch (err) { console.error('[sync] boot run failed', err); }
+  }
+
+  const handle = setInterval(() => {
+    try { syncSessions(); } catch (err) { console.error('[sync] tick failed', err); }
+  }, intervalMs);
+  handle.unref(); // don't block process exit
+
+  setLoopState({ handle, startedAt: Date.now() });
+  return handle;
+}
