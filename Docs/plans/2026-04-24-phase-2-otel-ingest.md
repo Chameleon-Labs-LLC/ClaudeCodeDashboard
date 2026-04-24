@@ -249,13 +249,9 @@ Terminal: npm run setup:otel
   ```
   Expected: zero errors, zero warnings.
 
-- [ ] **2.0.2** Add `tsx` as a dev dependency and add the `setup:otel` npm script.
+- [ ] **2.0.2** Add the `setup:otel` npm script. <!-- Phase 1 actual: tsx ^4.21.0 is already in devDependencies — do NOT re-install it -->
 
-  Edit `package.json` — add to `devDependencies`:
-  ```json
-  "tsx": "^4.19.2"
-  ```
-  Add to `scripts`:
+  Edit `package.json` `scripts` only — add:
   ```json
   "setup:otel": "tsx scripts/setup-otel.ts"
   ```
@@ -263,7 +259,7 @@ Terminal: npm run setup:otel
   ```
   npm install
   ```
-  Expected: `node_modules/.bin/tsx` exists.
+  Expected: no-op for tsx (already present); `node_modules/.bin/tsx` exists.
 
 - [ ] **2.0.3** Create `types/otel.ts` with all TypeScript interfaces for OTLP shapes and parsed rows. This is the contract every other file in this phase depends on.
 
@@ -439,13 +435,13 @@ Terminal: npm run setup:otel
 
 Write the tests first. The parser has no I/O so it can be unit-tested with plain Node.
 
-- [ ] **2.1.1** Install a minimal test runner. Add `vitest` as dev dependency (used later for the integration test too):
+- [ ] **2.1.1** Install vitest alongside Phase 1's existing `tsx --test` runner. <!-- Phase 1 actual: "test" script is "tsx --test tests/**/*.test.ts" — DO NOT replace it. Add vitest under separate script names. -->
   ```
   npm install --save-dev vitest @vitest/coverage-v8
   ```
-  Add to `package.json` `scripts`:
+  Add to `package.json` `scripts` (do **NOT** touch the existing `"test"` key — Phase 1's 14 tests must keep running):
   ```json
-  "test": "vitest run",
+  "test:otel": "vitest run",
   "test:watch": "vitest"
   ```
   Add `vitest.config.ts` at the project root:
@@ -459,6 +455,7 @@ Write the tests first. The parser has no I/O so it can be unit-tested with plain
     },
   });
   ```
+  Note: Phase 1 tests live in `tests/` and run via `npm test` (tsx --test). Phase 2 unit tests live in `__tests__/` and run via `npm run test:otel` (vitest). Directories are intentionally separate to avoid runner conflicts.
 
 - [ ] **2.1.2** Create `__tests__/otel-parse.test.ts` — write ALL tests before any implementation code. Run them and confirm they fail with "cannot find module".
 
@@ -963,9 +960,9 @@ Write the tests first. The parser has no I/O so it can be unit-tested with plain
   }
   ```
 
-- [ ] **2.1.4** Run the unit tests. They must all pass green.
+- [ ] **2.1.4** Run the unit tests. They must all pass green. <!-- Phase 1 actual: use the new `test:otel` script — `npm test` runs Phase 1's tsx suite. -->
   ```
-  npm test
+  npm run test:otel
   ```
   Expected:
   ```
@@ -1189,10 +1186,10 @@ Write the tests first. The parser has no I/O so it can be unit-tested with plain
 
   Confirm the rows landed in SQLite. Open the DB with any SQLite viewer or:
   ```bash
-  # The DB path comes from lib/db.ts — likely ~/.claude/dashboard.db or data/dashboard.db
-  # Adjust path to match Phase 1's actual DB location
-  sqlite3 <DB_PATH> "SELECT event_name, session_id, cost_usd FROM otel_events LIMIT 5;"
-  sqlite3 <DB_PATH> "SELECT metric_name, metric_type, value FROM otel_metrics LIMIT 5;"
+  # Phase 1 actual: DB is at ~/.claude/ccd/dashboard.db (getClaudeHome()/ccd/dashboard.db).
+  # Override with CCD_DB_PATH env var when testing.
+  sqlite3 ~/.claude/ccd/dashboard.db "SELECT event_name, session_id, cost_usd FROM otel_events LIMIT 5;"
+  sqlite3 ~/.claude/ccd/dashboard.db "SELECT metric_name, metric_type, value FROM otel_metrics LIMIT 5;"
   ```
   Expected: one row each with the values from the curl commands above.
 
@@ -2354,7 +2351,9 @@ The invariant throughout: **`/v1/logs` and `/v1/metrics` return HTTP 200 always.
 
 Phase 2 is complete when ALL of the following are true:
 
-1. `npm test` (unit tests) passes: 11/11 tests green.
+1. <!-- Phase 1 actual: "test" script runs Phase 1's tsx suite (14 tests). Phase 2 vitest suite is under "test:otel". -->
+   `npm run test:otel` passes: 11/11 otel-parse tests green.
+   `npm test` still passes: Phase 1's 14 tests all green (no regression).
 2. `npm run test:integration` passes: 6/6 tests green (requires `npm run dev` running).
 3. `npx tsc --noEmit` — zero errors.
 4. `npm run lint` — zero errors.
