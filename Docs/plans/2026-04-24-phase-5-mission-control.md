@@ -377,7 +377,7 @@ function buildEnv(): NodeJS.ProcessEnv {
 function resolveModel(task: OpsTask): string {
   return task.model
     ?? process.env.MISSION_CONTROL_DEFAULT_MODEL
-    ?? 'claude-3-5-sonnet-20241022';
+    ?? 'claude-sonnet-4-6';
 }
 ```
 
