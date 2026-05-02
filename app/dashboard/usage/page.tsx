@@ -150,7 +150,7 @@ export default function UsagePage() {
           </thead>
           <tbody>
             {sortedSessions.map(s => (
-              <tr key={s.sessionId} className="border-b border-brand-navy-light/20 hover:bg-brand-navy-light/30">
+              <tr key={`${s.projectName}/${s.sessionId}`} className="border-b border-brand-navy-light/20 hover:bg-brand-navy-light/30">
                 <td className="px-3 py-2 text-white">{s.projectName}</td>
                 <td className="px-3 py-2 text-chameleon-blue">{s.model}</td>
                 <td className="px-3 py-2 text-gray-300">{fmt(s.inputTokens)}</td>
