@@ -11,7 +11,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getProjectsDir } from './claude-home';
-import { type TokenCounts } from './litellm-pricing';
+import { calculateCost, fastMultiplier, findPricing, type PricingResult, type TokenCounts } from './litellm-pricing';
+import { localDay } from './local-day';
 
 export interface UsageEntry extends TokenCounts {
   messageId?: string;
@@ -179,4 +180,177 @@ export function loadUsageEntries(projectsDir: string = getProjectsDir()): LoadRe
   }
   const entries = dedupeEntries(all);
   return { entries, rawEntryCount: all.length };
+}
+
+export type Granularity = 'day' | 'week' | 'month';
+
+export interface UsageReportOptions {
+  /** YYYY-MM-DD inclusive, local time */
+  since?: string;
+  /** YYYY-MM-DD inclusive, local time */
+  until?: string;
+  granularity?: Granularity;
+  /** exact project dir names */
+  projects?: string[];
+  /** display-model ids; "unknown" matches entries without a model */
+  models?: string[];
+}
+
+export interface TokenBreakdown extends TokenCounts {
+  totalTokens: number;
+  cost: number;
+}
+
+export interface UsageBucket extends TokenBreakdown {
+  /** YYYY-MM-DD (day), week-start YYYY-MM-DD (week), or YYYY-MM (month) */
+  period: string;
+  byModel: Record<string, TokenBreakdown>;
+}
+
+export interface SessionUsage extends TokenBreakdown {
+  sessionId: string;
+  projectName: string;
+  models: string[];
+  messageCount: number;
+  startedAt: string;
+  lastActivityAt: string;
+  byModel: Record<string, TokenBreakdown>;
+}
+
+export interface UsageReport {
+  totals: TokenBreakdown;
+  buckets: UsageBucket[];
+  byModel: Record<string, TokenBreakdown>;
+  byProject: Record<string, TokenBreakdown>;
+  sessions: SessionUsage[];
+  meta: {
+    granularity: Granularity;
+    rawEntryCount: number;
+    dedupedEntryCount: number;
+    /** distinct values across ALL entries (pre-filter) so the UI can render filter options */
+    allModels: string[];
+    allProjects: string[];
+    pricingSource: 'live' | 'fallback';
+  };
+}
+
+export function weekStart(dayKey: string): string {
+  // ISO week, Monday start. Computed in UTC from the day key to avoid DST edges.
+  const d = new Date(`${dayKey}T12:00:00Z`);
+  const dow = (d.getUTCDay() + 6) % 7; // Mon=0 .. Sun=6
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+function periodKey(dayKey: string, granularity: Granularity): string {
+  if (granularity === 'month') return dayKey.slice(0, 7);
+  if (granularity === 'week') return weekStart(dayKey);
+  return dayKey;
+}
+
+function emptyBreakdown(): TokenBreakdown {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: 0,
+    cost: 0,
+  };
+}
+
+function addTo(target: TokenBreakdown, e: UsageEntry, cost: number): void {
+  target.inputTokens += e.inputTokens;
+  target.outputTokens += e.outputTokens;
+  target.cacheCreationTokens += e.cacheCreationTokens;
+  target.cacheReadTokens += e.cacheReadTokens;
+  target.totalTokens += tokenTotal(e);
+  target.cost += cost;
+}
+
+export function buildUsageReport(
+  load: LoadResult,
+  pricing: PricingResult,
+  opts: UsageReportOptions = {},
+): UsageReport {
+  const granularity = opts.granularity ?? 'day';
+  const allModels = new Set<string>();
+  const allProjects = new Set<string>();
+  const totals = emptyBreakdown();
+  const buckets = new Map<string, UsageBucket>();
+  const byModel: Record<string, TokenBreakdown> = {};
+  const byProject: Record<string, TokenBreakdown> = {};
+  const sessions = new Map<string, SessionUsage>();
+
+  for (const e of load.entries) {
+    const displayModel = e.model ? (e.isFast ? `${e.model}-fast` : e.model) : 'unknown';
+    const day = localDay(e.timestampMs);
+    allModels.add(displayModel);
+    allProjects.add(e.projectName);
+    if (opts.since && day < opts.since) continue;
+    if (opts.until && day > opts.until) continue;
+    if (opts.projects?.length && !opts.projects.includes(e.projectName)) continue;
+    if (opts.models?.length && !opts.models.includes(displayModel)) continue;
+
+    const p = e.model ? findPricing(pricing.map, e.model) : undefined;
+    if (e.model && !p) {
+      console.error(`usage-engine: no pricing for model ${e.model}; costing 0`);
+    }
+    const cost = p ? calculateCost(p, e, e.isFast ? fastMultiplier(e.model!) : 1) : 0;
+
+    addTo(totals, e, cost);
+
+    const pk = periodKey(day, granularity);
+    let bucket = buckets.get(pk);
+    if (!bucket) {
+      bucket = { period: pk, ...emptyBreakdown(), byModel: {} };
+      buckets.set(pk, bucket);
+    }
+    addTo(bucket, e, cost);
+    addTo((bucket.byModel[displayModel] ??= emptyBreakdown()), e, cost);
+
+    addTo((byModel[displayModel] ??= emptyBreakdown()), e, cost);
+    addTo((byProject[e.projectName] ??= emptyBreakdown()), e, cost);
+
+    const sk = `${e.projectName}/${e.sessionId}`;
+    const iso = new Date(e.timestampMs).toISOString();
+    let sess = sessions.get(sk);
+    if (!sess) {
+      sess = {
+        sessionId: e.sessionId,
+        projectName: e.projectName,
+        models: [],
+        messageCount: 0,
+        startedAt: iso,
+        lastActivityAt: iso,
+        ...emptyBreakdown(),
+        byModel: {},
+      };
+      sessions.set(sk, sess);
+    }
+    addTo(sess, e, cost);
+    addTo((sess.byModel[displayModel] ??= emptyBreakdown()), e, cost);
+    sess.messageCount += 1;
+    if (iso < sess.startedAt) sess.startedAt = iso;
+    if (iso > sess.lastActivityAt) sess.lastActivityAt = iso;
+    if (!sess.models.includes(displayModel)) sess.models.push(displayModel);
+  }
+
+  return {
+    totals,
+    buckets: [...buckets.values()].sort((a, b) => a.period.localeCompare(b.period)),
+    byModel,
+    byProject,
+    sessions: [...sessions.values()].sort((a, b) =>
+      b.lastActivityAt.localeCompare(a.lastActivityAt),
+    ),
+    meta: {
+      granularity,
+      rawEntryCount: load.rawEntryCount,
+      dedupedEntryCount: load.entries.length,
+      allModels: [...allModels].sort(),
+      allProjects: [...allProjects].sort(),
+      pricingSource: pricing.source,
+    },
+  };
 }
