@@ -274,6 +274,7 @@ export function buildUsageReport(
   opts: UsageReportOptions = {},
 ): UsageReport {
   const granularity = opts.granularity ?? 'day';
+  const warnedModels = new Set<string>();
   const allModels = new Set<string>();
   const allProjects = new Set<string>();
   const totals = emptyBreakdown();
@@ -293,7 +294,8 @@ export function buildUsageReport(
     if (opts.models?.length && !opts.models.includes(displayModel)) continue;
 
     const p = e.model ? findPricing(pricing.map, e.model) : undefined;
-    if (e.model && !p) {
+    if (e.model && !p && !warnedModels.has(e.model)) {
+      warnedModels.add(e.model);
       console.error(`usage-engine: no pricing for model ${e.model}; costing 0`);
     }
     const cost = p ? calculateCost(p, e, e.isFast ? fastMultiplier(e.model!) : 1) : 0;

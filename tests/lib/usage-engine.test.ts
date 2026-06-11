@@ -184,6 +184,7 @@ test('weekStart returns the Monday of the ISO week', () => {
   assert.equal(weekStart('2026-06-10'), '2026-06-08');
   assert.equal(weekStart('2026-06-14'), '2026-06-08');
   assert.equal(weekStart('2026-06-08'), '2026-06-08');
+  assert.equal(weekStart('2026-01-01'), '2025-12-29'); // Thursday -> previous year's Monday
 });
 
 test('buildUsageReport groups by month when requested', () => {
