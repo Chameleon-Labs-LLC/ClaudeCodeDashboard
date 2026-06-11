@@ -255,9 +255,27 @@ CREATE TABLE IF NOT EXISTS notification_log (
 );
 `;
 
+/** node_modules is shared between Windows and WSL, so the compiled binary in
+ *  better-sqlite3/build/Release matches only the platform that ran `npm install`
+ *  (currently Windows). On Linux we side-load a separately provisioned binary
+ *  from .native/ instead — see scripts/provision-linux-sqlite.sh.
+ */
+function nativeBindingPath(): string | undefined {
+  if (process.platform !== 'linux') return undefined;
+  const p = path.join(process.cwd(), '.native', `linux-${process.arch}`, 'better_sqlite3.node');
+  if (!fs.existsSync(p)) {
+    console.error(
+      `db: ${p} not found — better-sqlite3 will try the (Windows-built) default and likely fail. ` +
+        'Run: bash scripts/provision-linux-sqlite.sh',
+    );
+    return undefined;
+  }
+  return p;
+}
+
 export function openDb(dbPath?: string): DB {
   const p = dbPath ?? getDbPath();
-  const db = new Database(p);
+  const db = new Database(p, { nativeBinding: nativeBindingPath() });
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('foreign_keys = ON');

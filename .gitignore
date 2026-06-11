@@ -97,3 +97,6 @@ dashboard.db-*
 .tmp/*
 !.tmp/.gitkeep
 claude_output.txt
+
+# Per-platform native binaries side-loaded for WSL (see scripts/provision-linux-sqlite.sh)
+.native/
