@@ -4,21 +4,9 @@ import type { DB } from './db';
 import { getDb } from './db';
 import { getProjectsDir } from './claude-home';
 import { localDay } from './local-day';
+import { calculateCost, findPricing, getPricingMapSync } from './litellm-pricing';
 
 const TOOL_CAP_MS = 10 * 60 * 1000; // 10 min — per source spec
-
-// Claude pricing per 1M tokens (coarse — matches lib/claude-usage.ts)
-const RATES: Record<string, { input: number; output: number }> = {
-  opus: { input: 15, output: 75 },
-  sonnet: { input: 3, output: 15 },
-  haiku: { input: 0.25, output: 1.25 },
-};
-function rateFor(model: string) {
-  const m = model.toLowerCase();
-  if (m.includes('opus')) return RATES.opus;
-  if (m.includes('haiku')) return RATES.haiku;
-  return RATES.sonnet;
-}
 
 export interface SyncStats {
   sessionsSynced: number;
@@ -52,7 +40,8 @@ interface Accum {
   dayModelBuckets: Map<string, { input: number; output: number; cacheRead: number; cacheCreate: number }>;
 }
 
-function bucketKey(day: string, model: string) { return `${day}${model}`; }
+const BUCKET_SEP = '\u0001';
+function bucketKey(day: string, model: string) { return `${day}${BUCKET_SEP}${model}`; }
 
 function parseOne(raw: string, sessionIdFromFile: string): Accum {
   const acc: Accum = {
@@ -198,8 +187,22 @@ export function syncSessions(opts: SyncOpts = {}): SyncStats {
 
     const totalTokens = acc.input + acc.output + acc.cacheRead + acc.cacheCreate;
     const effectiveTokens = acc.input + acc.output + acc.cacheCreate; // cache_read treated as free
-    const r = acc.model ? rateFor(acc.model) : RATES.sonnet;
-    const derivedCost = (acc.input + acc.cacheCreate) / 1e6 * r.input + (acc.output / 1e6) * r.output;
+    // Price each model's tokens at that model's rates (incl. cache classes).
+    // total_cost_usd from the transcript's result event stays authoritative when present.
+    const pricing = getPricingMapSync();
+    let derivedCost = 0;
+    for (const [key, b] of acc.dayModelBuckets) {
+      const model = key.split(BUCKET_SEP)[1];
+      const p = model ? findPricing(pricing.map, model) : undefined;
+      if (p) {
+        derivedCost += calculateCost(p, {
+          inputTokens: b.input,
+          outputTokens: b.output,
+          cacheCreationTokens: b.cacheCreate,
+          cacheReadTokens: b.cacheRead,
+        });
+      }
+    }
     const cost = acc.costUsd > 0 ? acc.costUsd : derivedCost;
 
     const startedMs = acc.startedAt ? Date.parse(acc.startedAt) : NaN;
@@ -237,7 +240,7 @@ export function syncSessions(opts: SyncOpts = {}): SyncStats {
     // Replace this session's per-day deltas wholesale. token_usage is rebuilt at end of sync.
     deleteSessionUsage.run(acc.sessionId);
     for (const [key, b] of acc.dayModelBuckets) {
-      const [day, model] = key.split('');
+      const [day, model] = key.split(BUCKET_SEP);
       insertSessionUsage.run(acc.sessionId, day, model, b.input, b.output, b.cacheRead, b.cacheCreate);
     }
   });
