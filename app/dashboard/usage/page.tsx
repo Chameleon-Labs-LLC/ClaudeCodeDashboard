@@ -231,6 +231,7 @@ export default function UsagePage() {
         {fmt(report.meta.dedupedEntryCount)} entries ({fmt(report.meta.rawEntryCount - report.meta.dedupedEntryCount)}{' '}
         duplicates removed) &middot; pricing: {report.meta.pricingSource === 'live' ? 'LiteLLM live' : 'bundled snapshot'}
         {loading ? ' · refreshing…' : ''}
+        {error && report && <span className="text-amber-400 ml-2">&#9888; could not refresh — showing last loaded data</span>}
       </p>
 
       {/* Controls */}
