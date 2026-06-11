@@ -13,7 +13,9 @@
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "setup:otel": "tsx scripts/setup-otel.ts",
-    "daemon": "tsx scripts/daemon.ts"
+    "daemon": "tsx scripts/daemon.ts",
+    "models:refresh": "curl -sf ${MODEL_REGISTRY_URL:-https://chameleonlabs-model-registry.s3.us-east-1.amazonaws.com/models/latest.json} -o lib/model-registry.fallback.json",
+    "pricing:refresh": "tsx scripts/refresh-pricing.ts"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5",
