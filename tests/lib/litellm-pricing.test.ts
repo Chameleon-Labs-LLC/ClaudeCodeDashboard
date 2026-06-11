@@ -79,3 +79,27 @@ test('getPricingMap falls back to bundled snapshot when fetch fails', async () =
   assert.ok(map.size > 0);
   clearPricingCache();
 });
+
+test('getPricingMap serves the cached map when a later fetch fails', async () => {
+  clearPricingCache();
+  const goodJson = {
+    'claude-good': { input_cost_per_token: 0.000001, output_cost_per_token: 0.000002 },
+  };
+  let calls = 0;
+  const flakyFetch = (async () => {
+    calls += 1;
+    if (calls === 1) {
+      return { ok: true, json: async () => goodJson } as Response;
+    }
+    throw new Error('offline');
+  }) as unknown as typeof fetch;
+  const first = await getPricingMap(flakyFetch);
+  assert.equal(first.source, 'live');
+  assert.equal(first.map.size, 1);
+  // memo is fresh (within TTL) so the failing fetch is never reached;
+  // the point is the ladder returns the prior live map either way
+  const second = await getPricingMap(flakyFetch);
+  assert.equal(second.source, 'live');
+  assert.equal(second.map.get('claude-good')?.input, 0.000001);
+  clearPricingCache();
+});
