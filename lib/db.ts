@@ -259,10 +259,24 @@ CREATE TABLE IF NOT EXISTS notification_log (
  *  better-sqlite3/build/Release matches only the platform that ran `npm install`
  *  (currently Windows). On Linux we side-load a separately provisioned binary
  *  from .native/ instead — see scripts/provision-linux-sqlite.sh.
+ *
+ *  Trust model: loading native code from a cwd-relative path is binary
+ *  planting if cwd is untrusted, so the default lookup only engages when cwd
+ *  is the app root — proven by it containing the very node_modules tree the
+ *  default loader would dlopen from anyway (no new attack surface). A mode
+ *  check is deliberately omitted: the drvfs mount reports 0777 on every file.
+ *  CCD_NATIVE_BINDING overrides the lookup and is trusted as given.
  */
 function nativeBindingPath(): string | undefined {
+  if (process.env.CCD_NATIVE_BINDING) {
+    return fs.realpathSync(process.env.CCD_NATIVE_BINDING);
+  }
   if (process.platform !== 'linux') return undefined;
-  const p = path.join(process.cwd(), '.native', `linux-${process.arch}`, 'better_sqlite3.node');
+  const appRoot = process.cwd();
+  if (!fs.existsSync(path.join(appRoot, 'node_modules', 'better-sqlite3'))) {
+    return undefined; // cwd is not the app install tree — let the default loader resolve
+  }
+  const p = path.join(appRoot, '.native', `linux-${process.arch}`, 'better_sqlite3.node');
   if (!fs.existsSync(p)) {
     console.error(
       `db: ${p} not found — better-sqlite3 will try the (Windows-built) default and likely fail. ` +
@@ -270,7 +284,7 @@ function nativeBindingPath(): string | undefined {
     );
     return undefined;
   }
-  return p;
+  return fs.realpathSync(p);
 }
 
 export function openDb(dbPath?: string): DB {
