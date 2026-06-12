@@ -11,7 +11,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getProjectsDir } from './claude-home';
-import { PRIMARY_SOURCE_LABEL } from './usage-sources';
+import {
+  PRIMARY_SOURCE_LABEL,
+  getSourcesPath,
+  loadSources,
+  resolveSourceRoot,
+} from './usage-sources';
 import { calculateCost, fastMultiplier, findPricing, type PricingResult, type TokenCounts } from './litellm-pricing';
 import { localDay } from './local-day';
 
@@ -33,6 +38,8 @@ export interface LoadResult {
   entries: UsageEntry[];
   /** entry count before deduplication */
   rawEntryCount: number;
+  /** labels of enabled sources whose projects dir could not be read */
+  unreachableSources: string[];
 }
 
 const USAGE_MARKER = '"usage":{';
@@ -150,7 +157,7 @@ export function loadUsageEntries(
     projectDirs = fs.readdirSync(projectsDir, { withFileTypes: true });
   } catch (err) {
     console.error('usage-engine: cannot read projects dir', projectsDir, err);
-    return { entries: [], rawEntryCount: 0 };
+    return { entries: [], rawEntryCount: 0, unreachableSources: [] };
   }
   for (const dirent of projectDirs) {
     if (!dirent.isDirectory()) continue;
@@ -188,7 +195,46 @@ export function loadUsageEntries(
     }
   }
   const entries = dedupeEntries(all);
-  return { entries, rawEntryCount: all.length };
+  return { entries, rawEntryCount: all.length, unreachableSources: [] };
+}
+
+export interface LoadAllOptions {
+  /** test override; defaults to the primary CLAUDE_HOME projects dir */
+  primaryProjectsDir?: string;
+  /** test override; defaults to ~/.claude/ccd/sources.json */
+  sourcesFile?: string;
+}
+
+/** Load usage entries from the primary root plus every enabled registered source. */
+export function loadAllUsageEntries(opts: LoadAllOptions = {}): LoadResult {
+  const all: UsageEntry[] = [];
+  let rawEntryCount = 0;
+  const unreachableSources: string[] = [];
+
+  const primary = loadUsageEntries(opts.primaryProjectsDir ?? getProjectsDir());
+  all.push(...primary.entries);
+  rawEntryCount += primary.rawEntryCount;
+
+  for (const source of loadSources(opts.sourcesFile ?? getSourcesPath())) {
+    if (!source.enabled) continue;
+    const projectsDir = path.join(resolveSourceRoot(source), 'projects');
+    let reachable = false;
+    try {
+      reachable = fs.statSync(projectsDir).isDirectory();
+    } catch {
+      /* unreachable */
+    }
+    if (!reachable) {
+      unreachableSources.push(source.label);
+      continue;
+    }
+    const result = loadUsageEntries(projectsDir, source.label);
+    all.push(...result.entries);
+    rawEntryCount += result.rawEntryCount;
+  }
+
+  // global dedup: a copied/rsynced root must not double-count
+  return { entries: dedupeEntries(all), rawEntryCount, unreachableSources };
 }
 
 export type Granularity = 'day' | 'week' | 'month';

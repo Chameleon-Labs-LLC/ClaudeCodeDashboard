@@ -7,6 +7,7 @@ import {
   parseUsageFile,
   dedupeEntries,
   loadUsageEntries,
+  loadAllUsageEntries,
   clearUsageFileCache,
   buildUsageReport,
   weekStart,
@@ -14,6 +15,7 @@ import {
 } from '../../lib/usage-engine';
 import { buildPricingMap } from '../../lib/litellm-pricing';
 import { localDay } from '../../lib/local-day';
+import { saveSources } from '../../lib/usage-sources';
 
 const TS = '2026-06-01T12:00:00.000Z';
 
@@ -146,7 +148,7 @@ const OPUS_ENTRY_COST =
 
 test('buildUsageReport prices each entry by its own model and buckets by local day', () => {
   const report = buildUsageReport(
-    { entries: [entry(), entry({ messageId: 'msg-2', model: undefined })], rawEntryCount: 3 },
+    { entries: [entry(), entry({ messageId: 'msg-2', model: undefined })], rawEntryCount: 3, unreachableSources: [] },
     PRICING,
   );
   assert.equal(report.buckets.length, 1);
@@ -167,6 +169,7 @@ test('buildUsageReport applies since/until/project/model filters', () => {
       entry({ messageId: 'msg-3', timestampMs: Date.parse('2026-05-01T12:00:00Z') }),
     ],
     rawEntryCount: 3,
+    unreachableSources: [],
   };
   const filtered = buildUsageReport(load, PRICING, {
     since: dayKey,
@@ -189,7 +192,7 @@ test('weekStart returns the Monday of the ISO week', () => {
 });
 
 test('buildUsageReport groups by month when requested', () => {
-  const report = buildUsageReport({ entries: [entry()], rawEntryCount: 1 }, PRICING, {
+  const report = buildUsageReport({ entries: [entry()], rawEntryCount: 1, unreachableSources: [] }, PRICING, {
     granularity: 'month',
   });
   assert.equal(report.buckets[0].period, localDay(Date.parse(TS)).slice(0, 7));
@@ -204,6 +207,7 @@ test('buildUsageReport aggregates sessions with per-model breakdown and activity
         entry({ messageId: 'msg-2', model: 'claude-haiku-4-5', timestampMs: later, outputTokens: 50 }),
       ],
       rawEntryCount: 2,
+      unreachableSources: [],
     },
     PRICING,
   );
@@ -217,7 +221,7 @@ test('buildUsageReport aggregates sessions with per-model breakdown and activity
 });
 
 test('buildUsageReport doubles opus-4-8 fast-mode cost and labels the model', () => {
-  const report = buildUsageReport({ entries: [entry({ isFast: true })], rawEntryCount: 1 }, PRICING);
+  const report = buildUsageReport({ entries: [entry({ isFast: true })], rawEntryCount: 1, unreachableSources: [] }, PRICING);
   const m = report.byModel['claude-opus-4-8-fast'];
   assert.ok(m);
   assert.ok(Math.abs(m.cost - OPUS_ENTRY_COST * 2) < 1e-12);
@@ -232,4 +236,54 @@ test('parseUsageFile tags entries with the given source label', () => {
 test('parseUsageFile defaults source to "This machine"', () => {
   const out = parseUsageFile(line(), 'sess-1', 'proj-a');
   assert.equal(out[0].source, 'This machine');
+});
+
+/** Build a fake .claude root containing one transcript line. */
+function fakeClaudeRoot(jsonl: string): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ccd-root-'));
+  const proj = path.join(root, 'projects', 'proj-a');
+  fs.mkdirSync(proj, { recursive: true });
+  fs.writeFileSync(path.join(proj, 'sess-1.jsonl'), jsonl + '\n');
+  return root;
+}
+
+test('loadAllUsageEntries merges roots, tags sources, skips unreachable', () => {
+  clearUsageFileCache();
+  const primary = fakeClaudeRoot(line());
+  // second root gets a DISTINCT message (msg-2/req-2) so it survives global dedup
+  const wsl = fakeClaudeRoot(
+    line({ requestId: 'req-2' }).replace('"msg-1"', '"msg-2"'),
+  );
+  const sourcesFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ccd-cfg-')), 'sources.json');
+  saveSources(
+    [
+      { id: 'wsl', label: 'WSL Ubuntu', path: wsl, enabled: true },
+      { id: 'gone', label: 'Old Laptop', path: path.join(os.tmpdir(), 'ccd-nope-xyz'), enabled: true },
+      { id: 'off', label: 'Disabled', path: wsl, enabled: false },
+    ],
+    sourcesFile,
+  );
+  const result = loadAllUsageEntries({
+    primaryProjectsDir: path.join(primary, 'projects'),
+    sourcesFile,
+  });
+  assert.equal(result.entries.length, 2);
+  assert.deepEqual(
+    result.entries.map((e) => e.source).sort(),
+    ['This machine', 'WSL Ubuntu'],
+  );
+  assert.deepEqual(result.unreachableSources, ['Old Laptop']);
+});
+
+test('loadAllUsageEntries dedups identical messages across roots', () => {
+  clearUsageFileCache();
+  const primary = fakeClaudeRoot(line());
+  const copy = fakeClaudeRoot(line()); // same messageId/requestId — a copied folder
+  const sourcesFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ccd-cfg-')), 'sources.json');
+  saveSources([{ id: 'copy', label: 'Copy', path: copy, enabled: true }], sourcesFile);
+  const result = loadAllUsageEntries({
+    primaryProjectsDir: path.join(primary, 'projects'),
+    sourcesFile,
+  });
+  assert.equal(result.entries.length, 1);
 });
