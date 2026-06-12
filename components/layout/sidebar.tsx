@@ -11,6 +11,7 @@ const navItems = [
   { href: '/dashboard/history', label: 'History', icon: '◷' },
   { href: '/dashboard/activity', label: 'Activity', icon: '⚡' },
   { href: '/dashboard/usage', label: 'Usage & Cost', icon: '◐' },
+  { href: '/dashboard/sources', label: 'Sources', icon: '⛁' },
   { href: '/dashboard/tools', label: 'Tool Analytics', icon: '⚙' },
   { href: '/dashboard/observability', label: 'Observability', icon: '◎' },
   { href: '/dashboard/claude-md', label: 'CLAUDE.md', icon: '◇' },
