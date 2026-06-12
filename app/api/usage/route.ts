@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { buildUsageReport, loadUsageEntries, type Granularity } from '@/lib/usage-engine';
+import { buildUsageReport, loadAllUsageEntries, type Granularity } from '@/lib/usage-engine';
 import { getPricingMap } from '@/lib/litellm-pricing';
 
 export const dynamic = 'force-dynamic';
@@ -17,12 +17,13 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const g = searchParams.get('granularity') ?? 'day';
-    const report = buildUsageReport(loadUsageEntries(), await getPricingMap(), {
+    const report = buildUsageReport(loadAllUsageEntries(), await getPricingMap(), {
       since: searchParams.get('since') ?? undefined,
       until: searchParams.get('until') ?? undefined,
       granularity: (GRANULARITIES.has(g) ? g : 'day') as Granularity,
       projects: listParam(searchParams, 'projects'),
       models: listParam(searchParams, 'models'),
+      sources: listParam(searchParams, 'sources'),
     });
     return NextResponse.json(report);
   } catch (err) {
