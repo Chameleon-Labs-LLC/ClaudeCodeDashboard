@@ -287,3 +287,24 @@ test('loadAllUsageEntries dedups identical messages across roots', () => {
   });
   assert.equal(result.entries.length, 1);
 });
+
+test('buildUsageReport: source filter, bySource totals, meta fields', () => {
+  const load = {
+    entries: [
+      entry(),
+      entry({ messageId: 'msg-9', requestId: 'req-9', source: 'WSL Ubuntu', outputTokens: 50 }),
+    ],
+    rawEntryCount: 2,
+    unreachableSources: ['Old Laptop'],
+  };
+  const all = buildUsageReport(load, PRICING);
+  assert.deepEqual(all.meta.allSources, ['This machine', 'WSL Ubuntu']);
+  assert.deepEqual(all.meta.unreachableSources, ['Old Laptop']);
+  assert.equal(all.bySource['WSL Ubuntu'].outputTokens, 50);
+  assert.equal(all.bySource['This machine'].outputTokens, 5);
+
+  const filtered = buildUsageReport(load, PRICING, { sources: ['WSL Ubuntu'] });
+  assert.equal(filtered.totals.outputTokens, 50);
+  // unfiltered option lists still expose every source
+  assert.deepEqual(filtered.meta.allSources, ['This machine', 'WSL Ubuntu']);
+});

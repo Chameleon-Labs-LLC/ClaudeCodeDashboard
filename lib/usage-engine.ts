@@ -249,6 +249,8 @@ export interface UsageReportOptions {
   projects?: string[];
   /** display-model ids; "unknown" matches entries without a model */
   models?: string[];
+  /** source labels; matches UsageEntry.source */
+  sources?: string[];
 }
 
 export interface TokenBreakdown extends TokenCounts {
@@ -277,6 +279,7 @@ export interface UsageReport {
   buckets: UsageBucket[];
   byModel: Record<string, TokenBreakdown>;
   byProject: Record<string, TokenBreakdown>;
+  bySource: Record<string, TokenBreakdown>;
   sessions: SessionUsage[];
   meta: {
     granularity: Granularity;
@@ -285,6 +288,8 @@ export interface UsageReport {
     /** distinct values across ALL entries (pre-filter) so the UI can render filter options */
     allModels: string[];
     allProjects: string[];
+    allSources: string[];
+    unreachableSources: string[];
     pricingSource: 'live' | 'fallback';
   };
 }
@@ -332,10 +337,12 @@ export function buildUsageReport(
   const warnedModels = new Set<string>();
   const allModels = new Set<string>();
   const allProjects = new Set<string>();
+  const allSources = new Set<string>();
   const totals = emptyBreakdown();
   const buckets = new Map<string, UsageBucket>();
   const byModel: Record<string, TokenBreakdown> = {};
   const byProject: Record<string, TokenBreakdown> = {};
+  const bySource: Record<string, TokenBreakdown> = {};
   const sessions = new Map<string, SessionUsage>();
 
   for (const e of load.entries) {
@@ -343,10 +350,12 @@ export function buildUsageReport(
     const day = localDay(e.timestampMs);
     allModels.add(displayModel);
     allProjects.add(e.projectName);
+    allSources.add(e.source);
     if (opts.since && day < opts.since) continue;
     if (opts.until && day > opts.until) continue;
     if (opts.projects?.length && !opts.projects.includes(e.projectName)) continue;
     if (opts.models?.length && !opts.models.includes(displayModel)) continue;
+    if (opts.sources?.length && !opts.sources.includes(e.source)) continue;
 
     const p = e.model ? findPricing(pricing.map, e.model) : undefined;
     if (e.model && !p && !warnedModels.has(e.model)) {
@@ -368,6 +377,7 @@ export function buildUsageReport(
 
     addTo((byModel[displayModel] ??= emptyBreakdown()), e, cost);
     addTo((byProject[e.projectName] ??= emptyBreakdown()), e, cost);
+    addTo((bySource[e.source] ??= emptyBreakdown()), e, cost);
 
     const sk = `${e.projectName}/${e.sessionId}`;
     const iso = new Date(e.timestampMs).toISOString();
@@ -398,6 +408,7 @@ export function buildUsageReport(
     buckets: [...buckets.values()].sort((a, b) => a.period.localeCompare(b.period)),
     byModel,
     byProject,
+    bySource,
     sessions: [...sessions.values()].sort((a, b) =>
       b.lastActivityAt.localeCompare(a.lastActivityAt),
     ),
@@ -407,6 +418,8 @@ export function buildUsageReport(
       dedupedEntryCount: load.entries.length,
       allModels: [...allModels].sort(),
       allProjects: [...allProjects].sort(),
+      allSources: [...allSources].sort(),
+      unreachableSources: load.unreachableSources,
       pricingSource: pricing.source,
     },
   };
