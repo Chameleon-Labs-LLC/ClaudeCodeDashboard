@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getProjectsDir } from './claude-home';
+import { PRIMARY_SOURCE_LABEL } from './usage-sources';
 import { calculateCost, fastMultiplier, findPricing, type PricingResult, type TokenCounts } from './litellm-pricing';
 import { localDay } from './local-day';
 
@@ -24,6 +25,8 @@ export interface UsageEntry extends TokenCounts {
   model?: string;
   sessionId: string;
   projectName: string;
+  /** which .claude root this entry came from (source label) */
+  source: string;
 }
 
 export interface LoadResult {
@@ -38,6 +41,7 @@ export function parseUsageFile(
   content: string,
   sessionId: string,
   projectName: string,
+  source: string = PRIMARY_SOURCE_LABEL,
 ): UsageEntry[] {
   const out: UsageEntry[] = [];
   for (const line of content.split('\n')) {
@@ -68,6 +72,7 @@ export function parseUsageFile(
       model,
       sessionId,
       projectName,
+      source,
       inputTokens: Number(u.input_tokens) || 0,
       outputTokens: Number(u.output_tokens) || 0,
       cacheCreationTokens: Number(u.cache_creation_input_tokens) || 0,
@@ -135,7 +140,10 @@ function sessionIdFromPath(filePath: string, projectDir: string): string {
   return head.endsWith('.jsonl') ? head.slice(0, -'.jsonl'.length) : head;
 }
 
-export function loadUsageEntries(projectsDir: string = getProjectsDir()): LoadResult {
+export function loadUsageEntries(
+  projectsDir: string = getProjectsDir(),
+  source: string = PRIMARY_SOURCE_LABEL,
+): LoadResult {
   const all: UsageEntry[] = [];
   let projectDirs: fs.Dirent[];
   try {
@@ -170,6 +178,7 @@ export function loadUsageEntries(projectsDir: string = getProjectsDir()): LoadRe
           fs.readFileSync(filePath, 'utf-8'),
           sessionId,
           dirent.name,
+          source,
         );
         fileCache.set(filePath, { mtimeMs: stat.mtimeMs, size: stat.size, entries });
         all.push(...entries);

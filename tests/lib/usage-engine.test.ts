@@ -49,6 +49,7 @@ function entry(over: Partial<UsageEntry> = {}): UsageEntry {
     model: 'claude-opus-4-8',
     sessionId: 'sess-1',
     projectName: 'proj-a',
+    source: 'This machine',
     inputTokens: 10,
     outputTokens: 5,
     cacheCreationTokens: 2,
@@ -220,4 +221,15 @@ test('buildUsageReport doubles opus-4-8 fast-mode cost and labels the model', ()
   const m = report.byModel['claude-opus-4-8-fast'];
   assert.ok(m);
   assert.ok(Math.abs(m.cost - OPUS_ENTRY_COST * 2) < 1e-12);
+});
+
+test('parseUsageFile tags entries with the given source label', () => {
+  const out = parseUsageFile(line(), 'sess-1', 'proj-a', 'WSL Ubuntu');
+  assert.equal(out.length, 1);
+  assert.equal(out[0].source, 'WSL Ubuntu');
+});
+
+test('parseUsageFile defaults source to "This machine"', () => {
+  const out = parseUsageFile(line(), 'sess-1', 'proj-a');
+  assert.equal(out[0].source, 'This machine');
 });
