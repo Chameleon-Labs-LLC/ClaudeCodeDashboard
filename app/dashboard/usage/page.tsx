@@ -29,6 +29,7 @@ interface UsageReport {
   buckets: UsageBucket[];
   byModel: Record<string, TokenBreakdown>;
   byProject: Record<string, TokenBreakdown>;
+  bySource: Record<string, TokenBreakdown>;
   sessions: SessionUsage[];
   meta: {
     granularity: 'day' | 'week' | 'month';
@@ -36,6 +37,8 @@ interface UsageReport {
     dedupedEntryCount: number;
     allModels: string[];
     allProjects: string[];
+    allSources: string[];
+    unreachableSources: string[];
     pricingSource: 'live' | 'fallback';
   };
 }
@@ -130,6 +133,7 @@ export default function UsagePage() {
   const [granularity, setGranularity] = useState<Granularity>('day');
   const [projects, setProjects] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
+  const [sources, setSources] = useState<string[]>([]);
   const [metric, setMetric] = useState<Metric>('cost');
   const [classes, setClasses] = useState<TokenClass[]>(TOKEN_CLASSES.map((c) => c.key));
 
@@ -144,8 +148,9 @@ export default function UsagePage() {
     if (until) p.set('until', until);
     if (projects.length) p.set('projects', projects.join(','));
     if (models.length) p.set('models', models.join(','));
+    if (sources.length) p.set('sources', sources.join(','));
     return p.toString();
-  }, [since, until, granularity, projects, models]);
+  }, [since, until, granularity, projects, models, sources]);
 
   useEffect(() => {
     let cancelled = false;
@@ -289,6 +294,9 @@ export default function UsagePage() {
         </select>
         <MultiSelect label="Projects" options={report.meta.allProjects} selected={projects} onChange={setProjects} />
         <MultiSelect label="Models" options={report.meta.allModels} selected={models} onChange={setModels} />
+        {report.meta.allSources.length > 1 && (
+          <MultiSelect label="Sources" options={report.meta.allSources} selected={sources} onChange={setSources} />
+        )}
         <div className="flex items-center gap-1">
           {(['cost', 'tokens'] as Metric[]).map((m) => (
             <button
@@ -320,6 +328,14 @@ export default function UsagePage() {
           ))}
         </div>
       </div>
+
+      {report.meta.unreachableSources.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-amber-400 text-sm mb-4">
+          Totals exclude {report.meta.unreachableSources.length} unreachable source
+          {report.meta.unreachableSources.length > 1 ? 's' : ''}:{' '}
+          {report.meta.unreachableSources.join(', ')} — check the Sources tab.
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -402,6 +418,38 @@ export default function UsagePage() {
             </div>
           ))}
       </div>
+
+      {/* By Source */}
+      {Object.keys(report.bySource).length > 1 && (
+        <>
+          <h3 className="text-lg text-white font-semibold mb-4">By Source</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {Object.entries(report.bySource)
+              .sort(([, a], [, b]) => b.cost - a.cost)
+              .map(([source, data]) => (
+                <div
+                  key={source}
+                  className="bg-brand-navy-light/50 border border-brand-navy-light/30 rounded-lg p-4 hover:border-brand-cyan/20 transition-colors"
+                >
+                  <p className="text-brand-cyan text-sm font-medium mb-2">{source}</p>
+                  <div className="space-y-1 text-xs">
+                    <p className="text-gray-400">
+                      Input: <span className="text-white">{fmt(data.inputTokens)}</span> &middot; Output:{' '}
+                      <span className="text-white">{fmt(data.outputTokens)}</span>
+                    </p>
+                    <p className="text-gray-400">
+                      Cache write: <span className="text-white">{fmt(data.cacheCreationTokens)}</span> &middot; read:{' '}
+                      <span className="text-white">{fmt(data.cacheReadTokens)}</span>
+                    </p>
+                    <p className="text-gray-400">
+                      Cost: <span className="text-chameleon-green">{fmtCost(data.cost)}</span>
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </>
+      )}
 
       {/* Sessions */}
       <h3 className="text-lg text-white font-semibold mb-4">Sessions</h3>
