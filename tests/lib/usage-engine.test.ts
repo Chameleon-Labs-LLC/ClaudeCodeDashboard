@@ -437,9 +437,9 @@ test('loadAllUsageEntries refreshes a stale snapshot in the background', async (
     const stale = loadAllUsageEntries(opts);
     assert.equal(stale.entries.length, 2);
 
-    // …and the background refresh lands on the next tick
-    await new Promise((r) => setImmediate(r));
-    await new Promise((r) => setImmediate(r));
+    // …and the background refresh lands after its flush delay (250ms —
+    // deferred past the response so the sweep can't block the request)
+    await new Promise((r) => setTimeout(r, 600));
     const fresh = loadAllUsageEntries(opts);
     assert.equal(fresh.entries.length, 3);
   } finally {

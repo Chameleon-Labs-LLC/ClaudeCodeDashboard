@@ -336,17 +336,21 @@ export function loadAllUsageEntries(opts: LoadAllOptions = {}): LoadResult {
     if (snapshot) {
       appendAll(all, snapshot.entries);
       rawEntryCount += snapshot.rawEntryCount;
-      if (Date.now() - snapshot.sweptAtMs > ttlMs && !refreshingSources.has(source.label)) {
+      if (Date.now() - snapshot.sweptAtMs >= ttlMs && !refreshingSources.has(source.label)) {
         refreshingSources.add(source.label);
         const db = opts.db;
-        setImmediate(() => {
+        // setTimeout, NOT setImmediate: immediates run before the HTTP
+        // response flushes, so the sweep (sync, ~50s over 9P) would block
+        // the very request that triggered it. The delay lets it leave first.
+        const timer = setTimeout(() => {
           try {
             const fresh = sweepSource(source, projectsDir, db);
             if (fresh) writeSourceSnapshot(db!, source.label, fresh);
           } finally {
             refreshingSources.delete(source.label);
           }
-        });
+        }, 250);
+        timer.unref?.();
       }
       continue;
     }
