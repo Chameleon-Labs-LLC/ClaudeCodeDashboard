@@ -1,0 +1,17 @@
+# This checkout is shared between Windows (PowerShell) and WSL. Normalize all
+# text to LF in the repo so Windows tools rewriting CRLF don't churn the tree.
+* text=auto eol=lf
+
+# Windows scripts need CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries
+*.png binary
+*.jpg binary
+*.ico binary
+*.node binary
+*.db binary
+*.woff binary
+*.woff2 binary
