@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getProjectsDir } from './claude-home';
+import type { DB } from './db';
 import {
   PRIMARY_SOURCE_LABEL,
   getSourcesPath,
@@ -139,6 +140,43 @@ export function clearUsageFileCache(): void {
   fileCache.clear();
 }
 
+/** push(...items) overflows the call stack past ~125k elements; loop instead. */
+function appendAll<T>(target: T[], items: T[]): void {
+  for (const item of items) target.push(item);
+}
+
+/** SQLite tier of the file cache: survives server restarts and dev-mode module
+ *  reloads, which wipe the in-memory Map. All failures degrade to a re-parse. */
+function sqliteCacheGet(db: DB, filePath: string, mtimeMs: number, size: number): UsageEntry[] | undefined {
+  try {
+    const row = db
+      .prepare('SELECT mtime_ms, size, entries_json FROM usage_file_cache WHERE path = ?')
+      .get(filePath) as { mtime_ms: number; size: number; entries_json: string } | undefined;
+    if (!row || row.mtime_ms !== mtimeMs || row.size !== size) return undefined;
+    return JSON.parse(row.entries_json) as UsageEntry[];
+  } catch (err) {
+    console.error('usage-engine: sqlite cache read failed for', filePath, err);
+    return undefined;
+  }
+}
+
+function sqliteCachePut(
+  db: DB,
+  rows: Array<{ path: string; mtimeMs: number; size: number; entries: UsageEntry[] }>,
+): void {
+  if (!rows.length) return;
+  try {
+    const stmt = db.prepare(
+      'INSERT OR REPLACE INTO usage_file_cache (path, mtime_ms, size, entries_json) VALUES (?, ?, ?, ?)',
+    );
+    db.transaction(() => {
+      for (const r of rows) stmt.run(r.path, r.mtimeMs, r.size, JSON.stringify(r.entries));
+    })();
+  } catch (err) {
+    console.error('usage-engine: sqlite cache write failed', err);
+  }
+}
+
 function sessionIdFromPath(filePath: string, projectDir: string): string {
   // projects/<project>/<session>.jsonl            -> <session>
   // projects/<project>/<session>/**/<file>.jsonl  -> <session>
@@ -150,8 +188,10 @@ function sessionIdFromPath(filePath: string, projectDir: string): string {
 export function loadUsageEntries(
   projectsDir: string = getProjectsDir(),
   source: string = PRIMARY_SOURCE_LABEL,
+  db?: DB | null,
 ): LoadResult {
   const all: UsageEntry[] = [];
+  const pendingWrites: Array<{ path: string; mtimeMs: number; size: number; entries: UsageEntry[] }> = [];
   let projectDirs: fs.Dirent[];
   try {
     projectDirs = fs.readdirSync(projectsDir, { withFileTypes: true });
@@ -177,8 +217,16 @@ export function loadUsageEntries(
         const stat = fs.statSync(filePath);
         const cached = fileCache.get(filePath);
         if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
-          all.push(...cached.entries);
+          appendAll(all, cached.entries);
           continue;
+        }
+        if (db) {
+          const persisted = sqliteCacheGet(db, filePath, stat.mtimeMs, stat.size);
+          if (persisted) {
+            fileCache.set(filePath, { mtimeMs: stat.mtimeMs, size: stat.size, entries: persisted });
+            appendAll(all, persisted);
+            continue;
+          }
         }
         const sessionId = sessionIdFromPath(filePath, projectDir);
         const entries = parseUsageFile(
@@ -188,12 +236,14 @@ export function loadUsageEntries(
           source,
         );
         fileCache.set(filePath, { mtimeMs: stat.mtimeMs, size: stat.size, entries });
-        all.push(...entries);
+        if (db) pendingWrites.push({ path: filePath, mtimeMs: stat.mtimeMs, size: stat.size, entries });
+        appendAll(all, entries);
       } catch (err) {
         console.error('usage-engine: failed to read', filePath, err);
       }
     }
   }
+  if (db) sqliteCachePut(db, pendingWrites);
   const entries = dedupeEntries(all);
   return { entries, rawEntryCount: all.length, unreachableSources: [] };
 }
@@ -203,33 +253,111 @@ export interface LoadAllOptions {
   primaryProjectsDir?: string;
   /** test override; defaults to ~/.claude/ccd/sources.json */
   sourcesFile?: string;
+  /** persistent parse cache; omit/null for in-memory caching only */
+  db?: DB | null;
+  /** snapshot age that triggers a background source re-sweep (default 15 min) */
+  sourceTtlMs?: number;
 }
+
+const DEFAULT_SOURCE_TTL_MS = 15 * 60 * 1000;
+
+interface SourceSnapshot {
+  sweptAtMs: number;
+  rawEntryCount: number;
+  entries: UsageEntry[];
+}
+
+function readSourceSnapshot(db: DB, label: string): SourceSnapshot | undefined {
+  try {
+    const row = db
+      .prepare('SELECT swept_at_ms, raw_entry_count, entries_json FROM usage_source_snapshot WHERE label = ?')
+      .get(label) as { swept_at_ms: number; raw_entry_count: number; entries_json: string } | undefined;
+    if (!row) return undefined;
+    return {
+      sweptAtMs: row.swept_at_ms,
+      rawEntryCount: row.raw_entry_count,
+      entries: JSON.parse(row.entries_json) as UsageEntry[],
+    };
+  } catch (err) {
+    console.error('usage-engine: source snapshot read failed for', label, err);
+    return undefined;
+  }
+}
+
+function writeSourceSnapshot(db: DB, label: string, result: { entries: UsageEntry[]; rawEntryCount: number }): void {
+  try {
+    db.prepare(
+      'INSERT OR REPLACE INTO usage_source_snapshot (label, swept_at_ms, raw_entry_count, entries_json) VALUES (?, ?, ?, ?)',
+    ).run(label, Date.now(), result.rawEntryCount, JSON.stringify(result.entries));
+  } catch (err) {
+    console.error('usage-engine: source snapshot write failed for', label, err);
+  }
+}
+
+/** Sweep a source's projects dir; undefined when the root is unreachable. */
+function sweepSource(
+  source: { label: string },
+  projectsDir: string,
+  db?: DB | null,
+): LoadResult | undefined {
+  try {
+    if (!fs.statSync(projectsDir).isDirectory()) return undefined;
+  } catch {
+    return undefined;
+  }
+  return loadUsageEntries(projectsDir, source.label, db);
+}
+
+const refreshingSources = new Set<string>();
 
 /** Load usage entries from the primary root plus every enabled registered source. */
 export function loadAllUsageEntries(opts: LoadAllOptions = {}): LoadResult {
   const all: UsageEntry[] = [];
   let rawEntryCount = 0;
   const unreachableSources: string[] = [];
+  const ttlMs = opts.sourceTtlMs ?? DEFAULT_SOURCE_TTL_MS;
 
-  const primary = loadUsageEntries(opts.primaryProjectsDir ?? getProjectsDir());
-  all.push(...primary.entries);
+  const primary = loadUsageEntries(
+    opts.primaryProjectsDir ?? getProjectsDir(),
+    PRIMARY_SOURCE_LABEL,
+    opts.db,
+  );
+  appendAll(all, primary.entries);
   rawEntryCount += primary.rawEntryCount;
 
   for (const source of loadSources(opts.sourcesFile ?? getSourcesPath())) {
     if (!source.enabled) continue;
     const projectsDir = path.join(resolveSourceRoot(source), 'projects');
-    let reachable = false;
-    try {
-      reachable = fs.statSync(projectsDir).isDirectory();
-    } catch {
-      /* unreachable */
+
+    // Sources can sit on slow filesystems (\\wsl.localhost 9P: ~45s per
+    // metadata sweep), so requests never sweep them directly: serve the
+    // snapshot and refresh it in the background once it exceeds the TTL.
+    const snapshot = opts.db ? readSourceSnapshot(opts.db, source.label) : undefined;
+    if (snapshot) {
+      appendAll(all, snapshot.entries);
+      rawEntryCount += snapshot.rawEntryCount;
+      if (Date.now() - snapshot.sweptAtMs > ttlMs && !refreshingSources.has(source.label)) {
+        refreshingSources.add(source.label);
+        const db = opts.db;
+        setImmediate(() => {
+          try {
+            const fresh = sweepSource(source, projectsDir, db);
+            if (fresh) writeSourceSnapshot(db!, source.label, fresh);
+          } finally {
+            refreshingSources.delete(source.label);
+          }
+        });
+      }
+      continue;
     }
-    if (!reachable) {
+
+    const result = sweepSource(source, projectsDir, opts.db);
+    if (!result) {
       unreachableSources.push(source.label);
       continue;
     }
-    const result = loadUsageEntries(projectsDir, source.label);
-    all.push(...result.entries);
+    if (opts.db) writeSourceSnapshot(opts.db, source.label, result);
+    appendAll(all, result.entries);
     rawEntryCount += result.rawEntryCount;
   }
 

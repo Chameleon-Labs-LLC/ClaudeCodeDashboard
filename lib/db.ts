@@ -243,6 +243,27 @@ CREATE TABLE IF NOT EXISTS system_state (
   updated_at TEXT
 );
 
+-- Per-file parsed usage entries (lib/usage-engine.ts). Keyed by absolute path
+-- and validated against mtime+size, so cold starts skip re-parsing hundreds of
+-- MB of JSONL transcripts that never change.
+CREATE TABLE IF NOT EXISTS usage_file_cache (
+  path TEXT PRIMARY KEY,
+  mtime_ms REAL NOT NULL,
+  size INTEGER NOT NULL,
+  entries_json TEXT NOT NULL
+);
+
+-- Whole-source usage snapshots (lib/usage-engine.ts). Registered sources can
+-- live on slow filesystems (e.g. \\wsl.localhost over 9P, where a metadata
+-- sweep of ~2k transcripts costs ~45s), so requests serve the snapshot and a
+-- background pass refreshes it when older than the source TTL.
+CREATE TABLE IF NOT EXISTS usage_source_snapshot (
+  label TEXT PRIMARY KEY,
+  swept_at_ms REAL NOT NULL,
+  raw_entry_count INTEGER NOT NULL,
+  entries_json TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS notification_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   event_type TEXT NOT NULL,
@@ -260,36 +281,76 @@ CREATE TABLE IF NOT EXISTS notification_log (
  *  (currently Windows). On Linux we side-load a separately provisioned binary
  *  from .native/ instead — see scripts/provision-linux-sqlite.sh.
  *
+ *  Candidates are tried at runtime until one dlopens instead of branching on
+ *  process.platform: Turbopack constant-folds process.platform at compile
+ *  time, and a chunk compiled on one platform must still pick a working
+ *  binary when this shared checkout is run from the other (platform only
+ *  influences trial ORDER here, never correctness).
+ *
  *  Trust model: loading native code from a cwd-relative path is binary
- *  planting if cwd is untrusted, so the default lookup only engages when cwd
+ *  planting if cwd is untrusted, so the .native lookup only engages when cwd
  *  is the app root — proven by it containing the very node_modules tree the
  *  default loader would dlopen from anyway (no new attack surface). A mode
  *  check is deliberately omitted: the drvfs mount reports 0777 on every file.
- *  CCD_NATIVE_BINDING overrides the lookup and is trusted as given.
+ *  CCD_NATIVE_BINDING overrides the lookup entirely and is trusted as given.
  */
-function nativeBindingPath(): string | undefined {
+export function _bindingCandidates(appRoot: string = process.cwd()): (string | undefined)[] {
   if (process.env.CCD_NATIVE_BINDING) {
-    return fs.realpathSync(process.env.CCD_NATIVE_BINDING);
+    return [fs.realpathSync(process.env.CCD_NATIVE_BINDING)];
   }
-  if (process.platform !== 'linux') return undefined;
-  const appRoot = process.cwd();
-  if (!fs.existsSync(path.join(appRoot, 'node_modules', 'better-sqlite3'))) {
-    return undefined; // cwd is not the app install tree — let the default loader resolve
+  const candidates: (string | undefined)[] = [undefined]; // node_modules default loader
+  try {
+    if (!fs.existsSync(path.join(appRoot, 'node_modules', 'better-sqlite3'))) {
+      return candidates; // cwd is not the app install tree — default loader only
+    }
+    const nativeDir = path.join(appRoot, '.native');
+    const preferred = `${process.platform}-${process.arch}`;
+    const dirs = fs
+      .readdirSync(nativeDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort((a, b) => Number(b === preferred) - Number(a === preferred));
+    for (const dir of dirs) {
+      const p = path.join(nativeDir, dir, 'better_sqlite3.node');
+      if (fs.existsSync(p)) candidates.push(fs.realpathSync(p));
+    }
+  } catch {
+    /* no .native dir — default loader only */
   }
-  const p = path.join(appRoot, '.native', `linux-${process.arch}`, 'better_sqlite3.node');
-  if (!fs.existsSync(p)) {
-    console.error(
-      `db: ${p} not found — better-sqlite3 will try the (Windows-built) default and likely fail. ` +
-        'Run: bash scripts/provision-linux-sqlite.sh',
-    );
-    return undefined;
-  }
-  return fs.realpathSync(p);
+  return candidates;
 }
+
+/** Once a binding loads, keep using it for every later openDb in this process. */
+let workingBinding: string | undefined | null = null;
 
 export function openDb(dbPath?: string): DB {
   const p = dbPath ?? getDbPath();
-  const db = new Database(p, { nativeBinding: nativeBindingPath() });
+  if (workingBinding !== null) {
+    return initDb(new Database(p, { nativeBinding: workingBinding }));
+  }
+  const candidates = _bindingCandidates();
+  let lastErr: unknown;
+  for (const candidate of candidates) {
+    try {
+      const db = new Database(p, { nativeBinding: candidate });
+      workingBinding = candidate;
+      return initDb(db);
+    } catch (err) {
+      // only a failed addon load moves to the next candidate; real database
+      // errors (bad path, locked file) surface immediately
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code !== 'ERR_DLOPEN_FAILED' && code !== 'MODULE_NOT_FOUND') throw err;
+      lastErr = err;
+    }
+  }
+  console.error(
+    `db: no better-sqlite3 binding loaded (tried ${candidates.length} candidate(s)). ` +
+      'On WSL, run: bash scripts/provision-linux-sqlite.sh',
+  );
+  throw lastErr;
+}
+
+function initDb(db: DB): DB {
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('foreign_keys = ON');

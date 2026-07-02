@@ -16,6 +16,7 @@ import {
 import { buildPricingMap } from '../../lib/litellm-pricing';
 import { localDay } from '../../lib/local-day';
 import { saveSources } from '../../lib/usage-sources';
+import { openDb } from '../../lib/db';
 
 const TS = '2026-06-01T12:00:00.000Z';
 
@@ -286,6 +287,167 @@ test('loadAllUsageEntries dedups identical messages across roots', () => {
     sourcesFile,
   });
   assert.equal(result.entries.length, 1);
+});
+
+test('loadUsageEntries handles files with more entries than the spread-argument limit', () => {
+  clearUsageFileCache();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'usage-big-'));
+  try {
+    const proj = path.join(root, '-mnt-big');
+    fs.mkdirSync(proj, { recursive: true });
+    const COUNT = 130_000; // Array.prototype.push(...arr) throws RangeError near 125k
+    const lines: string[] = new Array(COUNT);
+    for (let i = 0; i < COUNT; i++) {
+      lines[i] = line({ requestId: `req-${i}`, message: {
+        role: 'assistant', id: `msg-${i}`, model: 'claude-opus-4-8',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      } });
+    }
+    fs.writeFileSync(path.join(proj, 'sess-big.jsonl'), lines.join('\n') + '\n');
+    const result = loadUsageEntries(root);
+    assert.equal(result.entries.length, COUNT);
+    const all = loadAllUsageEntries({
+      primaryProjectsDir: root,
+      sourcesFile: path.join(root, 'no-sources.json'),
+    });
+    assert.equal(all.entries.length, COUNT);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    clearUsageFileCache();
+  }
+});
+
+test('loadUsageEntries persists parsed entries to sqlite and reuses them after a restart', () => {
+  clearUsageFileCache();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'usage-db-'));
+  const db = openDb(path.join(root, 'cache.db'));
+  try {
+    const proj = path.join(root, 'projects', '-mnt-demo');
+    fs.mkdirSync(proj, { recursive: true });
+    const file = path.join(proj, 'sess-1.jsonl');
+    const mtime = new Date('2026-06-01T00:00:00Z');
+    fs.writeFileSync(file, line() + '\n');
+    fs.utimesSync(file, mtime, mtime);
+
+    const projectsDir = path.join(root, 'projects');
+    const r1 = loadUsageEntries(projectsDir, undefined, db);
+    assert.equal(r1.entries[0].inputTokens, 10);
+
+    // Same size + mtime but different content: a re-parse would see 99, a
+    // cache hit returns the original 10. Memory cache is cleared to simulate
+    // a server restart, so only the sqlite layer can produce 10.
+    fs.writeFileSync(file, (line() + '\n').replace('"input_tokens":10', '"input_tokens":99'));
+    fs.utimesSync(file, mtime, mtime);
+    clearUsageFileCache();
+    const r2 = loadUsageEntries(projectsDir, undefined, db);
+    assert.equal(r2.entries[0].inputTokens, 10);
+
+    // without a db handle the engine re-parses from disk
+    clearUsageFileCache();
+    const r3 = loadUsageEntries(projectsDir);
+    assert.equal(r3.entries[0].inputTokens, 99);
+  } finally {
+    db.close();
+    fs.rmSync(root, { recursive: true, force: true });
+    clearUsageFileCache();
+  }
+});
+
+test('loadAllUsageEntries forwards the db handle to every root', () => {
+  clearUsageFileCache();
+  const primary = fakeClaudeRoot(line());
+  const db = openDb(path.join(primary, 'cache.db'));
+  try {
+    const file = path.join(primary, 'projects', 'proj-a', 'sess-1.jsonl');
+    const mtime = new Date('2026-06-01T00:00:00Z');
+    fs.utimesSync(file, mtime, mtime);
+    const sourcesFile = path.join(primary, 'sources.json');
+    saveSources([], sourcesFile);
+    const opts = { primaryProjectsDir: path.join(primary, 'projects'), sourcesFile, db };
+    const r1 = loadAllUsageEntries(opts);
+    assert.equal(r1.entries[0].inputTokens, 10);
+
+    fs.writeFileSync(file, (line() + '\n').replace('"input_tokens":10', '"input_tokens":99'));
+    fs.utimesSync(file, mtime, mtime);
+    clearUsageFileCache();
+    const r2 = loadAllUsageEntries(opts);
+    assert.equal(r2.entries[0].inputTokens, 10);
+  } finally {
+    db.close();
+    fs.rmSync(primary, { recursive: true, force: true });
+    clearUsageFileCache();
+  }
+});
+
+test('loadAllUsageEntries snapshots each source and serves the snapshot without re-sweeping', async () => {
+  clearUsageFileCache();
+  const primary = fakeClaudeRoot(line());
+  const wsl = fakeClaudeRoot(line({ requestId: 'req-2' }).replace('"msg-1"', '"msg-2"'));
+  const db = openDb(path.join(primary, 'cache.db'));
+  const sourcesFile = path.join(primary, 'sources.json');
+  saveSources([{ id: 'wsl', label: 'WSL Ubuntu', path: wsl, enabled: true }], sourcesFile);
+  const opts = {
+    primaryProjectsDir: path.join(primary, 'projects'),
+    sourcesFile,
+    db,
+    sourceTtlMs: 60_000,
+  };
+  try {
+    const r1 = loadAllUsageEntries(opts);
+    assert.equal(r1.entries.length, 2);
+
+    // delete the source root entirely — a fresh snapshot must keep serving it
+    // with zero filesystem access, and without flagging it unreachable
+    fs.rmSync(wsl, { recursive: true, force: true });
+    clearUsageFileCache();
+    const r2 = loadAllUsageEntries(opts);
+    assert.equal(r2.entries.length, 2);
+    assert.deepEqual(r2.unreachableSources, []);
+    assert.ok(r2.entries.some((e) => e.source === 'WSL Ubuntu'));
+  } finally {
+    db.close();
+    fs.rmSync(primary, { recursive: true, force: true });
+    fs.rmSync(wsl, { recursive: true, force: true });
+    clearUsageFileCache();
+  }
+});
+
+test('loadAllUsageEntries refreshes a stale snapshot in the background', async () => {
+  clearUsageFileCache();
+  const primary = fakeClaudeRoot(line());
+  const wsl = fakeClaudeRoot(line({ requestId: 'req-2' }).replace('"msg-1"', '"msg-2"'));
+  const db = openDb(path.join(primary, 'cache.db'));
+  const sourcesFile = path.join(primary, 'sources.json');
+  saveSources([{ id: 'wsl', label: 'WSL Ubuntu', path: wsl, enabled: true }], sourcesFile);
+  const opts = {
+    primaryProjectsDir: path.join(primary, 'projects'),
+    sourcesFile,
+    db,
+    sourceTtlMs: 0, // every snapshot is immediately stale
+  };
+  try {
+    loadAllUsageEntries(opts); // writes the first snapshot
+
+    // grow the source, then load again: the stale snapshot is served now…
+    fs.writeFileSync(
+      path.join(wsl, 'projects', 'proj-a', 'sess-2.jsonl'),
+      line({ requestId: 'req-3' }).replace('"msg-1"', '"msg-3"') + '\n',
+    );
+    clearUsageFileCache();
+    const stale = loadAllUsageEntries(opts);
+    assert.equal(stale.entries.length, 2);
+
+    // …and the background refresh lands on the next tick
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    const fresh = loadAllUsageEntries(opts);
+    assert.equal(fresh.entries.length, 3);
+  } finally {
+    db.close();
+    fs.rmSync(primary, { recursive: true, force: true });
+    fs.rmSync(wsl, { recursive: true, force: true });
+    clearUsageFileCache();
+  }
 });
 
 test('buildUsageReport: source filter, bySource totals, meta fields', () => {

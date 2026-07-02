@@ -57,8 +57,9 @@ npm-debug.log*
 *.temp
 .cache/
 
-# Next.js
+# Next.js (per-platform distDir — see next.config.js)
 .next/
+.next-*/
 out/
 build/
 dist/

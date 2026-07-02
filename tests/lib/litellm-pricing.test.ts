@@ -103,3 +103,19 @@ test('getPricingMap serves the cached map when a later fetch fails', async () =>
   assert.equal(second.map.get('claude-good')?.input, 0.000001);
   clearPricingCache();
 });
+
+test('getPricingMap negative-caches a failed fetch instead of retrying every call', async () => {
+  clearPricingCache();
+  let calls = 0;
+  const failingFetch = (() => {
+    calls += 1;
+    throw new Error('offline');
+  }) as unknown as typeof fetch;
+  const first = await getPricingMap(failingFetch);
+  assert.equal(first.source, 'fallback');
+  const second = await getPricingMap(failingFetch);
+  assert.equal(second.source, 'fallback');
+  // the failure is remembered — no second network attempt within the failure TTL
+  assert.equal(calls, 1);
+  clearPricingCache();
+});

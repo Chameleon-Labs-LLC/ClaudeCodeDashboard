@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // --- API response types (mirror lib/usage-engine.ts) ---
 interface TokenBreakdown {
@@ -152,29 +152,38 @@ export default function UsagePage() {
     return p.toString();
   }, [since, until, granularity, projects, models, sources]);
 
+  const firstFetch = useRef(true);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/usage?${query}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
-        if (!cancelled) {
-          setReport(data);
-          setError(null);
-        }
-      })
-      .catch((err) => {
-        console.error('usage fetch failed:', err);
-        if (!cancelled) setError(String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    // debounce filter changes so rapid checkbox toggling coalesces into one
+    // request; the initial load fires immediately
+    const delay = firstFetch.current ? 0 : 250;
+    firstFetch.current = false;
+    const timer = setTimeout(() => {
+      fetch(`/api/usage?${query}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((data) => {
+          if (!cancelled) {
+            setReport(data);
+            setError(null);
+          }
+        })
+        .catch((err) => {
+          console.error('usage fetch failed:', err);
+          if (!cancelled) setError(String(err));
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, delay);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [query]);
 

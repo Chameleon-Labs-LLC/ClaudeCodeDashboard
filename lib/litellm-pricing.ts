@@ -126,8 +126,17 @@ export interface PricingResult {
 
 let memo: { map: Map<string, ModelPricing>; ts: number; source: 'live' | 'fallback' } | null = null;
 
+/** Negative cache: offline hosts would otherwise pay the full fetch timeout on
+ *  every request until the network comes back. */
+const FAILURE_TTL_MS = 5 * 60 * 1000;
+let failedAt = 0;
+
 export async function getPricingMap(fetchImpl: typeof fetch = fetch): Promise<PricingResult> {
   if (memo && Date.now() - memo.ts < TTL_MS) return { map: memo.map, source: memo.source };
+  if (Date.now() - failedAt < FAILURE_TTL_MS) {
+    if (memo) return { map: memo.map, source: memo.source };
+    return { map: fallbackMap, source: 'fallback' };
+  }
   try {
     const res = await fetchImpl(LITELLM_PRICING_URL, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -140,6 +149,7 @@ export async function getPricingMap(fetchImpl: typeof fetch = fetch): Promise<Pr
     return { map, source: 'live' };
   } catch (err) {
     console.error('litellm-pricing fetch failed; using cache/fallback:', err);
+    failedAt = Date.now();
     if (memo) return { map: memo.map, source: memo.source };
     return { map: fallbackMap, source: 'fallback' };
   }
@@ -152,4 +162,5 @@ export function getPricingMapSync(): PricingResult {
 
 export function clearPricingCache(): void {
   memo = null;
+  failedAt = 0;
 }

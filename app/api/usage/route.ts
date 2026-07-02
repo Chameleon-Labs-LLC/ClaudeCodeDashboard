@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { buildUsageReport, loadAllUsageEntries, type Granularity } from '@/lib/usage-engine';
 import { getPricingMap } from '@/lib/litellm-pricing';
+import { getDb, type DB } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const g = searchParams.get('granularity') ?? 'day';
-    const report = buildUsageReport(loadAllUsageEntries(), await getPricingMap(), {
+    // kick the (memoized) pricing fetch off before the synchronous file scan
+    const pricingPromise = getPricingMap();
+    // usage loading works without the persistent cache; don't let a sqlite
+    // failure (e.g. missing native binding) take the whole endpoint down
+    let db: DB | null = null;
+    try {
+      db = getDb();
+    } catch (err) {
+      console.error('GET /api/usage: sqlite unavailable, parse cache disabled:', err);
+    }
+    const load = loadAllUsageEntries({ db });
+    const report = buildUsageReport(load, await pricingPromise, {
       since: searchParams.get('since') ?? undefined,
       until: searchParams.get('until') ?? undefined,
       granularity: (GRANULARITIES.has(g) ? g : 'day') as Granularity,
