@@ -25,6 +25,7 @@ import {
   updateTask,
 } from './task-tracker';
 import type { OpsTask } from '@/types/mission-control';
+import { resolveModelId } from './models';
 
 export const MAX_CONCURRENT = parseInt(process.env.MAX_CONCURRENT ?? '3', 10);
 export const TASK_TIMEOUT_MS =
@@ -84,11 +85,12 @@ function buildEnv(): NodeJS.ProcessEnv {
   };
 }
 
-function resolveModel(task: OpsTask): string {
+async function resolveModel(task: OpsTask): Promise<string> {
   return (
     task.model ??
     process.env.MISSION_CONTROL_DEFAULT_MODEL ??
-    'claude-sonnet-4-6'
+    // Never throws: lib/models.ts wires the bundled fallback snapshot.
+    (await resolveModelId('anthropic', 'sonnet'))
   );
 }
 
@@ -151,7 +153,7 @@ function makeLineReader(
 
 async function runClassic(task: OpsTask): Promise<void> {
   const prompt = [task.title, task.description].filter(Boolean).join('\n\n');
-  const model = resolveModel(task);
+  const model = await resolveModel(task);
   const args = ['-p', prompt, '--model', model, '--output-format', 'json'];
   if (task.dry_run) args.push('--dry-run');
 
@@ -225,7 +227,7 @@ function postHttp(urlPath: string, body: object): void {
 
 async function runStream(task: OpsTask): Promise<void> {
   const prompt = [task.title, task.description].filter(Boolean).join('\n\n');
-  const model = resolveModel(task);
+  const model = await resolveModel(task);
   const args = [
     '-p', prompt,
     '--model', model,

@@ -6,7 +6,8 @@
  * To implement:
  *   1. Add @anthropic-ai/sdk to dependencies.
  *   2. Set ANTHROPIC_API_KEY in .env.
- *   3. Call claude-3-haiku-20240307 with:
+ *   3. Call the current haiku model — resolve it via
+ *      `resolveModelId('anthropic', 'haiku')` from lib/models.ts — with:
  *      "Given task title '<title>' and description '<desc>', which skill
  *       from this list best matches? Reply with exactly the skill name
  *       or 'none': <skills.join(', ')>"
