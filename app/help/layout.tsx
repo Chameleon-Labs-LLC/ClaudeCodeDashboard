@@ -3,7 +3,7 @@ import HelpBanner from '@/components/help/help-banner';
 
 export default function HelpLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-brand-navy">
+    <div className="flex h-screen bg-brand-navy">
       <HelpSidebar />
       <main className="flex-1 flex flex-col overflow-auto">
         <HelpBanner />
