@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { isValidElement, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { slugify } from '@/lib/slugify';
@@ -9,6 +9,7 @@ function headingText(children: ReactNode): string {
   if (typeof children === 'string') return children;
   if (typeof children === 'number') return String(children);
   if (Array.isArray(children)) return children.map(headingText).join('');
+  if (isValidElement<{ children?: ReactNode }>(children)) return headingText(children.props.children);
   return '';
 }
 
