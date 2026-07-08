@@ -29,3 +29,12 @@ test('prefix match requires a path-segment boundary', () => {
   // '/dashboard/sessionsX' must NOT match '/dashboard/sessions'
   assert.equal(helpTopicForPath('/dashboard/sessionsX').helpSlug, 'overview');
 });
+
+test('overview is the first nav item (helpTopicForPath fallback target)', () => {
+  assert.equal(navItems[0].helpSlug, 'overview');
+});
+
+test('nav hrefs are unique', () => {
+  const hrefs = navItems.map((n) => n.href);
+  assert.equal(new Set(hrefs).size, hrefs.length);
+});

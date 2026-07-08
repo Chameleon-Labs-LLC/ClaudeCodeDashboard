@@ -36,10 +36,11 @@ export default function HelpBanner() {
         <span className="text-gray-300">You&apos;re browsing Help</span>
       </div>
       <div className="flex items-center gap-3">
-        <button onClick={close} className="text-sm text-chameleon-amber hover:underline">
+        <button type="button" onClick={close} className="text-sm text-chameleon-amber hover:underline">
           ← Back to {backLabel}
         </button>
         <button
+          type="button"
           onClick={close}
           aria-label="Close help"
           className="w-7 h-7 rounded-lg border border-chameleon-amber/40 text-chameleon-amber hover:bg-chameleon-amber/10"

@@ -49,7 +49,7 @@ export default async function HelpTopicPage({
     <article>
       <h1 className="font-heading text-3xl text-chameleon-amber mb-2">{topic.title}</h1>
       {topic.sections.length > 1 && (
-        <nav className="mb-6 text-sm text-gray-400 flex flex-wrap gap-x-4 gap-y-1">
+        <nav aria-label="On this page" className="mb-6 text-sm text-gray-400 flex flex-wrap gap-x-4 gap-y-1">
           {topic.sections.map((s) => (
             <a key={s.id} href={`#${s.id}`} className="hover:text-chameleon-amber">
               {s.text}

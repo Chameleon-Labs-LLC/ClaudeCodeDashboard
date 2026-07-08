@@ -8,7 +8,7 @@ export default function TopicPager({ slug }: { slug: string }) {
   const next = i < navItems.length - 1 ? navItems[i + 1] : undefined;
 
   return (
-    <nav className="mt-10 pt-4 border-t border-brand-navy-light/30 flex items-center justify-between text-sm">
+    <nav aria-label="Help topics" className="mt-10 pt-4 border-t border-brand-navy-light/30 flex items-center justify-between text-sm">
       {prev ? (
         <Link href={`/help/${prev.helpSlug}`} className="text-chameleon-amber hover:underline">
           ◀ Prev: {prev.label}
