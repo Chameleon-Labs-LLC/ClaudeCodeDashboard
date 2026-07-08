@@ -5,7 +5,7 @@ Local GUI dashboard for Claude Code — browse sessions, manage memory, search, 
 Reads directly from `~/.claude/` filesystem. No database, no auth, no deployment — purely local.
 
 ## Tech Stack
-- Next.js 14 App Router, TypeScript, Tailwind CSS
+- Next.js 16 App Router, TypeScript, Tailwind CSS
 - File-system based data (reads `~/.claude/` directory)
 - gray-matter for YAML frontmatter parsing
 - Fuse.js for client-side fuzzy search
@@ -30,6 +30,8 @@ Reads directly from `~/.claude/` filesystem. No database, no auth, no deployment
 - `app/api/memory/` — memory CRUD endpoints
 - `app/api/search/` — full-text search endpoint
 - `app/dashboard/` — main dashboard layout and pages
+- `app/help/` — help-mode routes (`/help/<topic>`) with mirrored amber sidebar
+- `content/help/` — markdown help topics, one per nav page (loaded by `lib/help-content.ts`)
 
 ## Debugging / Production
 - This is a local-only tool — no production deployment
