@@ -2,24 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: '⊞' },
-  { href: '/dashboard/sessions', label: 'Sessions', icon: '◉' },
-  { href: '/dashboard/memory', label: 'Memory', icon: '◈' },
-  { href: '/dashboard/projects', label: 'Projects', icon: '◆' },
-  { href: '/dashboard/history', label: 'History', icon: '◷' },
-  { href: '/dashboard/activity', label: 'Activity', icon: '⚡' },
-  { href: '/dashboard/usage', label: 'Usage & Cost', icon: '◐' },
-  { href: '/dashboard/sources', label: 'Sources', icon: '⛁' },
-  { href: '/dashboard/tools', label: 'Tool Analytics', icon: '⚙' },
-  { href: '/dashboard/observability', label: 'Observability', icon: '◎' },
-  { href: '/dashboard/claude-md', label: 'CLAUDE.md', icon: '◇' },
-  { href: '/dashboard/settings', label: 'Settings', icon: '⚑' },
-  { href: '/dashboard/file-history', label: 'File History', icon: '◫' },
-  { href: '/dashboard/tasks', label: 'Mission Control', icon: '⌂' },
-  { href: '/dashboard/search', label: 'Search', icon: '⌕' },
-];
+import { navItems } from './nav-items';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -50,10 +33,17 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <div className="p-3 border-t border-brand-navy-light/30 text-xs text-gray-600">
-        <span className="text-gray-500">Press</span>{' '}
-        <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded text-brand-cyan text-[10px]">/</kbd>{' '}
-        <span className="text-gray-500">to search</span>
+      <div className="p-3 border-t border-brand-navy-light/30 text-xs text-gray-600 space-y-1">
+        <div>
+          <span className="text-gray-500">Press</span>{' '}
+          <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded text-brand-cyan text-[10px]">/</kbd>{' '}
+          <span className="text-gray-500">to search</span>
+        </div>
+        <div>
+          <span className="text-gray-500">Press</span>{' '}
+          <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded text-brand-cyan text-[10px]">?</kbd>{' '}
+          <span className="text-gray-500">for help</span>
+        </div>
       </div>
     </aside>
   );
