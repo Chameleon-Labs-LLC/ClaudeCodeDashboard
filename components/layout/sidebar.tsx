@@ -2,24 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: '⊞' },
-  { href: '/dashboard/sessions', label: 'Sessions', icon: '◉' },
-  { href: '/dashboard/memory', label: 'Memory', icon: '◈' },
-  { href: '/dashboard/projects', label: 'Projects', icon: '◆' },
-  { href: '/dashboard/history', label: 'History', icon: '◷' },
-  { href: '/dashboard/activity', label: 'Activity', icon: '⚡' },
-  { href: '/dashboard/usage', label: 'Usage & Cost', icon: '◐' },
-  { href: '/dashboard/sources', label: 'Sources', icon: '⛁' },
-  { href: '/dashboard/tools', label: 'Tool Analytics', icon: '⚙' },
-  { href: '/dashboard/observability', label: 'Observability', icon: '◎' },
-  { href: '/dashboard/claude-md', label: 'CLAUDE.md', icon: '◇' },
-  { href: '/dashboard/settings', label: 'Settings', icon: '⚑' },
-  { href: '/dashboard/file-history', label: 'File History', icon: '◫' },
-  { href: '/dashboard/tasks', label: 'Mission Control', icon: '⌂' },
-  { href: '/dashboard/search', label: 'Search', icon: '⌕' },
-];
+import { navItems } from './nav-items';
 
 export default function Sidebar() {
   const pathname = usePathname();
