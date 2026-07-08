@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { helpTopicForPath } from '@/components/layout/nav-items';
+import { isTypingTarget } from '@/lib/is-typing-target';
 import { HELP_RETURN_KEY } from './help-return';
 
 export default function HelpButton() {
@@ -17,8 +18,7 @@ export default function HelpButton() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== '?') return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (isTypingTarget(e.target)) return;
       e.preventDefault();
       openHelp();
     };
@@ -28,6 +28,7 @@ export default function HelpButton() {
 
   return (
     <button
+      type="button"
       onClick={openHelp}
       aria-label="Open help for this page"
       title="Help (?)"

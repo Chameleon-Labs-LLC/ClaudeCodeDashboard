@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { isTypingTarget } from '@/lib/is-typing-target';
 
 /**
  * Returns a ref to attach to a search input.
@@ -15,9 +16,8 @@ export function useSearchFocus<T extends HTMLInputElement>() {
     ref.current?.focus();
 
     function handleKeyDown(e: KeyboardEvent) {
-      // Skip if user is already typing in an input/textarea
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Skip if the user is typing in a form field or editable region
+      if (isTypingTarget(e.target)) return;
 
       if (e.key === '/') {
         e.preventDefault();
