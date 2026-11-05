@@ -10,6 +10,7 @@ export default [
   {
     ignores: [
       '.next/**',
+      '.next-*/**', // per-platform distDir, see next.config.js
       'out/**',
       'build/**',
       'node_modules/**',

@@ -1,6 +1,6 @@
 {
   "name": "claude-code-dashboard",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
@@ -23,7 +23,7 @@
     "fuse.js": "^7.0.0",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.400.0",
-    "next": "^16.2.3",
+    "next": "^16.4.1",
     "react": "^18",
     "react-dom": "^18",
     "react-markdown": "^10.1.0",
@@ -36,19 +36,23 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/coverage-v8": "^4.1.12",
     "autoprefixer": "^10",
     "eslint": "^10.2.0",
-    "eslint-config-next": "^16.2.3",
+    "eslint-config-next": "^16.4.1",
     "eventsource": "^2.0.2",
     "postcss": "^8",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.0",
     "typescript": "^5",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "next": {
       "postcss": "^8.5.10"
+    },
+    "minimatch@10": "11.0.1",
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "6.1.5"
     }
   }
 }
