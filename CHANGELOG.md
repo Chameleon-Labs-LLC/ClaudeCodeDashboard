@@ -22,10 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - feat(help): ? button, keyboard shortcut, and sidebar hint
 - feat(help): topic pages with markdown rendering, TOC anchors, prev/next pager
-- feat(help): help-mode chrome â€” amber sidebar, return banner, layout
+- feat(help): help-mode chrome — amber sidebar, return banner, layout
 - feat(help): author help topics for all 15 dashboard pages
 - feat(help): markdown topic loader with frontmatter and section anchors
-- feat(help): extract shared nav-items module with pathnameâ†’topic mapper
+- feat(help): extract shared nav-items module with pathname→topic mapper
 - feat(dispatcher): resolve default task model via the model registry
 - feat(usage): source filter and per-source breakdown on Usage page
 - feat(usage): Sources tab for managing additional .claude roots
@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(usage): multi-root usage loading with cross-root dedup
 - feat(usage): tag usage entries with their source root
 - feat(usage): add .claude source registry with validation
-- feat(usage): display controls â€” range, granularity, filters, metric toggles, drill-down
+- feat(usage): display controls — range, granularity, filters, metric toggles, drill-down
 - feat(usage): query-param-driven usage report endpoint
 - feat(usage): filterable usage report aggregation (day/week/month, per-model pricing)
 - feat(usage): per-entry JSONL parser with ccusage-parity dedup
@@ -112,15 +112,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(phase-4): FirehoseFeed panel with event.name filter
 - feat(phase-4): LiveSessionDetailSheet drawer with SSE timeline
 - feat(phase-4): LiveSessionsCard with 5s auto-refresh
-- feat(phase-4): useSSE hook â€” buffered EventSource subscriber
+- feat(phase-4): useSSE hook — buffered EventSource subscriber
 - feat(phase-4): SSE /api/firehose polling otel_events every 2s
 - feat(heartbeat): schedule materialiser with DST-safe cron parser
 - feat(phase-4): SSE /api/sessions/live/:id/stream with win32 poll fallback
 - feat(phase-4): GET /api/sessions/live/:id/state with hook + JSONL fallback
-- feat(phase-5-cp1): data layer â€” types, formatters, task-tracker
+- feat(phase-5-cp1): data layer — types, formatters, task-tracker
 - feat(phase-4): GET /api/sessions/live (5-min mtime window)
 - feat(phase-4): live-session helpers with TDD coverage
-- feat(phase-3): block A complete â€” all API routes + scaffold
+- feat(phase-3): block A complete — all API routes + scaffold
 - feat(phase-4): add live session + firehose type contracts
 - feat(phase-3): observability page scaffold + panel stubs
 - feat(phase-3): observability TypeScript types
@@ -142,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(phase-2): add otel-parse module with full unit test coverage
 - feat(phase-1): HMR-safe boot-time sync loop (120s, unref'd)
 - feat(phase-1): add POST /api/sync manual trigger
-- feat(phase-1): port JSONL sync â€” tool pairing + local-day buckets
+- feat(phase-1): port JSONL sync — tool pairing + local-day buckets
 - feat(phase-1): add SQLite schema with full spec tables + WAL
 - feat(phase-1): add localDay helper for evening-session bucketing
 - feat(phase-1): add better-sqlite3 + tsx test runner
@@ -167,7 +167,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - docs(plans): mark Phase 2 complete
 - docs(plans): refresh phase-2 plan against phase-1 reality
 - docs(plans): mark Phase 1 complete + log follow-up issues
-- chore(phase-1): final verification pass â€” ESLint 10 flat config
+- chore(phase-1): final verification pass — ESLint 10 flat config
 - test(phase-1): add JSONL fixtures for sync tests
 - docs(plans): add observability extension plans (master + 5 phases)
 - chore(deps): upgrade next to 16.2.3 to fix high-severity vulnerabilities
