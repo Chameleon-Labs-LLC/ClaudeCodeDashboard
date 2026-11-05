@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-05
+
+### Security
+- Raise Next.js to 16.4.1, the lowest 16.x release that clears all 19 open Dependabot alerts (3 critical, 7 high).
+- Clear the remaining `npm audit` findings: vitest 4.1.12, tsx 4.22.0 (esbuild 0.28), minimatch 11.0.1 under ESLint, postcss-selector-parser 6.1.5 under @tailwindcss/typography.
+- Refuse JavaScript front matter. gray-matter 4.0.3 (no fixed release) would `eval` `---js` front matter in any Markdown file the dashboard reads from `~/.claude`.
+
+### Fixed
+- `npm run lint` no longer lints the per-platform build output (`.next-<platform>/`).
+
 ## [0.5.0] - 2026-07-08
 
 ### Added
