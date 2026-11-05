@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import matter from 'gray-matter';
+import { parseFrontMatter } from './front-matter';
 import { slugify } from './slugify';
 
 export interface HelpSection {
@@ -27,7 +27,7 @@ export function getHelpTopic(slug: string, dir: string = DEFAULT_DIR): HelpTopic
   } catch {
     return null;
   }
-  const { data, content } = matter(raw);
+  const { data, content } = parseFrontMatter(raw);
   const title = typeof data.title === 'string' && data.title.length > 0 ? data.title : slug;
   const sections: HelpSection[] = [];
   for (const line of content.split('\n')) {

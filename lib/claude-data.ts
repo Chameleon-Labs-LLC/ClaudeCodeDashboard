@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import matter from 'gray-matter';
+import { parseFrontMatter } from './front-matter';
 import { getClaudeHome, getProjectsDir } from './claude-home';
 import { decodeClaudeProjectPath } from './claude-project-path';
 import type {
@@ -258,7 +258,7 @@ async function readMemoryDir(memoryDir: string, projectLabel?: string): Promise<
 
     const label = projectLabel ? `[${projectLabel}] ` : '';
     try {
-      const { data, content } = matter(raw);
+      const { data, content } = parseFrontMatter(raw);
       memories.push({
         fileName: f,
         name: `${label}${data.name || f.replace('.md', '')}`,
