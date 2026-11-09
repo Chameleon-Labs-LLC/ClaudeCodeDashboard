@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-09
+
+### Security
+- Raise Next.js to 16.4.5 for the 2026-11-03 Next.js security release: seven moderate advisories (cache disclosure and poisoning in `use cache`, response injection when forwarding fetched responses, an SVG check bypass in image optimization, and HttpOnly cookie exposure on Edge routes). They are published in the Next.js repository and had not reached the global advisory database, so Dependabot did not flag them.
+
 ## [0.5.1] - 2026-11-05
 
 ### Security
