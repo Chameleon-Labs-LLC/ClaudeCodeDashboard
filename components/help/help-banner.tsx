@@ -28,9 +28,9 @@ export default function HelpBanner() {
   const backLabel = helpTopicForPath((origin ?? '/dashboard').split('?')[0]).label;
 
   return (
-    <div className="sticky top-0 z-40 flex items-center justify-between gap-4 px-6 py-3 bg-chameleon-amber/10 border-b border-chameleon-amber/30 backdrop-blur">
+    <div className="sticky top-0 z-40 flex items-center justify-between gap-4 px-6 py-3 bg-chameleon-amber/10 border-b border-chameleon-amber/30 backdrop-blur-sm">
       <div className="flex items-center gap-3 text-sm">
-        <span className="px-2 py-0.5 rounded bg-chameleon-amber text-brand-navy-dark font-bold text-xs">
+        <span className="px-2 py-0.5 rounded-sm bg-chameleon-amber text-brand-navy-dark font-bold text-xs">
           ? HELP
         </span>
         <span className="text-gray-300">You&apos;re browsing Help</span>

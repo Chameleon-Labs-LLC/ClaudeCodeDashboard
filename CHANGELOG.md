@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-09
+
+### Security
+- Migrate Tailwind CSS from 3 to 4.3.3 to drop `braces` 3.0.3 (SNYK-JS-BRACES-19963945, High, no fixed release) from the production dependency tree. One dev-only path remains, through `eslint-config-next`, at lint time.
+
+### Changed
+- The Tailwind theme now lives in `@theme` in `app/globals.css`. `tailwind.config.ts` and `autoprefixer` are removed, and PostCSS uses `@tailwindcss/postcss`.
+- Compatibility styles keep the v3 look: border and placeholder colors, the button cursor, and rem line heights.
+
+### Fixed
+- The Mission Control composer drawers now open flush with the top of the window. They used to sit 24px low, which cut off their bottom edge.
+
 ## [0.5.2] - 2026-11-09
 
 ### Security

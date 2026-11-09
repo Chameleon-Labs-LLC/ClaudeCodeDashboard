@@ -1,6 +1,82 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-brand-cyan: #00d4ff;
+  --color-brand-cyan-light: #00bcd4;
+  --color-brand-cyan-dark: #0099cc;
+
+  --color-brand-navy: #0a0e27;
+  --color-brand-navy-light: #1a1e3f;
+  --color-brand-navy-dark: #050711;
+
+  --color-chameleon-magenta: #ff1493;
+  --color-chameleon-pink: #e91e63;
+  --color-chameleon-purple: #9c27b0;
+  --color-chameleon-violet: #673ab7;
+  --color-chameleon-blue: #2196f3;
+  --color-chameleon-blue-light: #03a9f4;
+  --color-chameleon-cyan: #00bcd4;
+  --color-chameleon-green: #4caf50;
+  --color-chameleon-green-light: #8bc34a;
+  --color-chameleon-lime: #cddc39;
+  --color-chameleon-yellow: #ffeb3b;
+  --color-chameleon-amber: #ffc107;
+  --color-chameleon-orange: #ff9800;
+  --color-chameleon-orange-deep: #ff5722;
+  --color-chameleon-red: #f44336;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans: var(--font-roboto), Roboto, sans-serif;
+  --font-heading: var(--font-limelight), Limelight, sans-serif;
+
+  /* v3 line heights. v4 uses unitless ratios, which children inherit and
+     rescale. Many rows here nest text-[10px] inside text-xs, so the ratios
+     shrink those rows. Fixed rem values keep the v3 layout. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  /* v3 preflight defaults that v4 dropped: placeholder color and the
+     pointer cursor on buttons. Kept so the UI behaves as it did on v3. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
 
 :root {
   --background: #0A0E27;

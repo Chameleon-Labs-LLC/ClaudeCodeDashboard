@@ -36,12 +36,12 @@ export default function Sidebar() {
       <div className="p-3 border-t border-brand-navy-light/30 text-xs text-gray-600 space-y-1">
         <div>
           <span className="text-gray-500">Press</span>{' '}
-          <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded text-brand-cyan text-[10px]">/</kbd>{' '}
+          <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded-sm text-brand-cyan text-[10px]">/</kbd>{' '}
           <span className="text-gray-500">to search</span>
         </div>
         <div>
           <span className="text-gray-500">Press</span>{' '}
-          <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded text-brand-cyan text-[10px]">?</kbd>{' '}
+          <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded-sm text-brand-cyan text-[10px]">?</kbd>{' '}
           <span className="text-gray-500">for help</span>
         </div>
       </div>

@@ -66,12 +66,12 @@ export default function HistoryPage() {
           placeholder="Search history... (press / to focus)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[200px] max-w-md px-4 py-2 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand-cyan/40"
+          className="flex-1 min-w-[200px] max-w-md px-4 py-2 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-hidden focus:border-brand-cyan/40"
         />
         <select
           value={projectFilter}
           onChange={(e) => setProjectFilter(e.target.value)}
-          className="px-4 py-2 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm focus:outline-none focus:border-brand-cyan/40"
+          className="px-4 py-2 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm focus:outline-hidden focus:border-brand-cyan/40"
         >
           <option value="all">All Projects</option>
           {projects.map(p => (

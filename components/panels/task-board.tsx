@@ -18,7 +18,7 @@ const STATUS_COLOURS: Record<TaskStatus, string> = {
 
 function StatusPill({ status }: { status: TaskStatus }) {
   return (
-    <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded ${STATUS_COLOURS[status]}`}>
+    <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-sm ${STATUS_COLOURS[status]}`}>
       {status.replace('_', ' ')}
     </span>
   );
@@ -48,12 +48,12 @@ function TaskCard({ task, onAction }: { task: OpsTask; onAction: () => void }) {
           {task.execution_mode === 'stream' ? 'Interactive' : 'One-shot'}
         </span>
         {task.risk_level && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-yellow-500/10 text-yellow-300 border border-yellow-500/20">
             {task.risk_level}
           </span>
         )}
         {task.dry_run === 1 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-300 border border-gray-500/30">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-gray-500/20 text-gray-300 border border-gray-500/30">
             dry-run
           </span>
         )}

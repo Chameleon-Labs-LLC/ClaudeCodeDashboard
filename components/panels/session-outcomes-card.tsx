@@ -19,12 +19,12 @@ type SegmentKey = typeof SEGMENTS[number]['key'];
 
 function StackedBar({ day }: { day: OutcomeDay }) {
   if (day.total === 0) return (
-    <div className="h-full bg-brand-navy/40 rounded-sm" title={day.date} />
+    <div className="h-full bg-brand-navy/40 rounded-xs" title={day.date} />
   );
 
   return (
     <div
-      className="flex flex-col-reverse h-full rounded-sm overflow-hidden"
+      className="flex flex-col-reverse h-full rounded-xs overflow-hidden"
       title={
         `${day.date}\n` +
         SEGMENTS.map(s => `${s.label}: ${day[s.key as SegmentKey]}`).join('\n')
@@ -71,8 +71,8 @@ export default function SessionOutcomesCard({ range }: Props) {
 
   if (loading) return (
     <div className="bg-brand-navy-light border border-brand-navy-light/50 rounded-xl p-5 h-full">
-      <div className="h-4 w-40 bg-brand-navy/60 rounded animate-pulse mb-4" />
-      <div className="h-32 bg-brand-navy/60 rounded animate-pulse" />
+      <div className="h-4 w-40 bg-brand-navy/60 rounded-sm animate-pulse mb-4" />
+      <div className="h-32 bg-brand-navy/60 rounded-sm animate-pulse" />
     </div>
   );
 
@@ -130,7 +130,7 @@ export default function SessionOutcomesCard({ range }: Props) {
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
             {SEGMENTS.map(s => (
               <div key={s.key} className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: s.color }} />
+                <div className="w-2 h-2 rounded-xs" style={{ backgroundColor: s.color }} />
                 <span className="text-[10px] text-gray-500">{s.label}</span>
               </div>
             ))}

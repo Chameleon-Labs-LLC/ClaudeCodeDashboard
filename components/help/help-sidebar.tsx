@@ -35,7 +35,7 @@ export default function HelpSidebar() {
       </nav>
       <div className="p-3 border-t border-chameleon-amber/30 text-xs text-gray-600">
         <span className="text-gray-500">Press</span>{' '}
-        <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded text-chameleon-amber text-[10px]">Esc</kbd>{' '}
+        <kbd className="px-1.5 py-0.5 bg-brand-navy-light rounded-sm text-chameleon-amber text-[10px]">Esc</kbd>{' '}
         <span className="text-gray-500">to close help</span>
       </div>
     </aside>

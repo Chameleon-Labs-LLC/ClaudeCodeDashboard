@@ -39,7 +39,7 @@ export default function SessionsPage() {
         placeholder="Filter sessions... (press / to focus)"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
-        className="w-full max-w-md mb-6 px-4 py-2 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand-cyan/40"
+        className="w-full max-w-md mb-6 px-4 py-2 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-hidden focus:border-brand-cyan/40"
       />
 
       {loading ? (

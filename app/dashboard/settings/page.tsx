@@ -289,13 +289,13 @@ export default function SettingsPage() {
                     {wizardRunning ? 'Running...' : 'Apply missing settings'}
                   </button>
                   <span className="text-gray-500 text-xs">or run</span>
-                  <code className="text-brand-cyan font-mono text-xs bg-brand-navy-dark/50 px-2 py-1 rounded">
+                  <code className="text-brand-cyan font-mono text-xs bg-brand-navy-dark/50 px-2 py-1 rounded-sm">
                     npm run setup:otel
                   </code>
                   <span className="text-gray-500 text-xs">from the terminal</span>
                 </div>
                 {wizardResult && (
-                  <p className="text-sm text-gray-300 bg-brand-navy-dark/50 p-3 rounded font-mono">
+                  <p className="text-sm text-gray-300 bg-brand-navy-dark/50 p-3 rounded-sm font-mono">
                     {wizardResult}
                   </p>
                 )}

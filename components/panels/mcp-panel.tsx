@@ -18,12 +18,12 @@ function fmtMs(ms: number | null): string {
 function SpeedTag({ p95Ms }: { p95Ms: number | null }) {
   if (p95Ms === null) return null;
   if (p95Ms >= 10_000) return (
-    <span className="ml-2 text-[10px] font-mono uppercase tracking-widest text-chameleon-red border border-chameleon-red/30 px-1.5 py-0.5 rounded">
+    <span className="ml-2 text-[10px] font-mono uppercase tracking-widest text-chameleon-red border border-chameleon-red/30 px-1.5 py-0.5 rounded-sm">
       · slow
     </span>
   );
   if (p95Ms < 500) return (
-    <span className="ml-2 text-[10px] font-mono uppercase tracking-widest text-chameleon-green border border-chameleon-green/30 px-1.5 py-0.5 rounded">
+    <span className="ml-2 text-[10px] font-mono uppercase tracking-widest text-chameleon-green border border-chameleon-green/30 px-1.5 py-0.5 rounded-sm">
       · fast
     </span>
   );
@@ -83,7 +83,7 @@ function ToolsPanel({ server, range }: { server: string; range: string }) {
   if (loading) return (
     <div className="mt-3 space-y-1.5 px-3">
       {[1, 2, 3].map(i => (
-        <div key={i} className="h-8 bg-brand-navy/60 rounded animate-pulse" />
+        <div key={i} className="h-8 bg-brand-navy/60 rounded-sm animate-pulse" />
       ))}
     </div>
   );
@@ -193,7 +193,7 @@ export default function McpPanel({ range }: Props) {
       <p className="text-gray-400 text-sm font-medium">No MCP servers detected</p>
       <p className="text-gray-600 text-xs mt-2 max-w-xs mx-auto">
         Install an MCP server and use it in a session to see latency data here.
-        Try: <code className="text-chameleon-amber bg-brand-navy-dark px-1 rounded">claude mcp add</code>
+        Try: <code className="text-chameleon-amber bg-brand-navy-dark px-1 rounded-sm">claude mcp add</code>
       </p>
     </div>
   );

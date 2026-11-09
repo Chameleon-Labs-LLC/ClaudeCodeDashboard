@@ -75,9 +75,9 @@ export default function CacheEfficiencyCard({ range }: Props) {
 
   if (loading) return (
     <div className="bg-brand-navy-light border border-brand-navy-light/50 rounded-xl p-5 h-full">
-      <div className="h-4 w-32 bg-brand-navy/60 rounded animate-pulse mb-4" />
-      <div className="h-12 w-24 bg-brand-navy/60 rounded animate-pulse mb-4" />
-      <div className="h-10 bg-brand-navy/60 rounded animate-pulse" />
+      <div className="h-4 w-32 bg-brand-navy/60 rounded-sm animate-pulse mb-4" />
+      <div className="h-12 w-24 bg-brand-navy/60 rounded-sm animate-pulse mb-4" />
+      <div className="h-10 bg-brand-navy/60 rounded-sm animate-pulse" />
     </div>
   );
 
@@ -110,7 +110,7 @@ export default function CacheEfficiencyCard({ range }: Props) {
           <div className="flex items-center gap-2">
             <span className={`text-4xl font-bold tabular-nums ${hitColor}`}>{hitPct}</span>
             {data.lowSample && (
-              <span className="text-[10px] font-mono uppercase tracking-widest text-chameleon-amber border border-chameleon-amber/30 px-1.5 py-0.5 rounded">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-chameleon-amber border border-chameleon-amber/30 px-1.5 py-0.5 rounded-sm">
                 low sample
               </span>
             )}

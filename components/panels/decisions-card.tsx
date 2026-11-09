@@ -47,7 +47,7 @@ export default function DecisionsCard() {
     <div className="bg-brand-navy-light border border-brand-navy-light/50 rounded-xl p-4">
       <h3 className="text-sm font-medium text-gray-200 mb-2">Pending decisions</h3>
       {loading ? (
-        <div className="h-12 bg-brand-navy/40 rounded animate-pulse" />
+        <div className="h-12 bg-brand-navy/40 rounded-sm animate-pulse" />
       ) : items.length === 0 ? (
         <p className="text-xs text-gray-500">
           No pending decisions — DECISION: markers from running stream tasks appear here.

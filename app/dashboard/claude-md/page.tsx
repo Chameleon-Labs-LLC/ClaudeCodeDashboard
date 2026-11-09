@@ -146,7 +146,7 @@ export default function ClaudeMdPage() {
                   <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full h-[60vh] px-4 py-3 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm font-mono placeholder:text-gray-500 focus:outline-none focus:border-brand-cyan/40 resize-none"
+                    className="w-full h-[60vh] px-4 py-3 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm font-mono placeholder:text-gray-500 focus:outline-hidden focus:border-brand-cyan/40 resize-none"
                   />
                 ) : (
                   <div className="bg-brand-navy-light/50 border border-brand-navy-light/30 rounded-lg p-4 max-h-[70vh] overflow-y-auto">

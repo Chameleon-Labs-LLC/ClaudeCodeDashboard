@@ -141,7 +141,7 @@ export default function ScheduleComposer({ open, onClose, onCreated }: Props) {
             </div>
             <div>
               <span className="text-gray-300">Cron preview</span>
-              <code className="block mt-1 bg-brand-navy/60 px-2 py-1 rounded text-[11px] text-gray-300">
+              <code className="block mt-1 bg-brand-navy/60 px-2 py-1 rounded-sm text-[11px] text-gray-300">
                 {cronPreview ?? '(select at least one day)'}
               </code>
               {dow.length > 1 && (

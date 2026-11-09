@@ -32,7 +32,7 @@ export default function HelpButton() {
       onClick={openHelp}
       aria-label="Open help for this page"
       title="Help (?)"
-      className="fixed top-5 right-6 z-50 w-9 h-9 rounded-full border border-brand-cyan/30 bg-brand-navy-dark/80 text-brand-cyan text-lg font-bold backdrop-blur hover:bg-brand-cyan/10 hover:border-brand-cyan/60 transition-colors"
+      className="fixed top-5 right-6 z-50 w-9 h-9 rounded-full border border-brand-cyan/30 bg-brand-navy-dark/80 text-brand-cyan text-lg font-bold backdrop-blur-sm hover:bg-brand-cyan/10 hover:border-brand-cyan/60 transition-colors"
     >
       ?
     </button>

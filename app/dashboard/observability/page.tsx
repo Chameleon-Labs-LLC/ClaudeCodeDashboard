@@ -44,7 +44,7 @@ export default function ObservabilityPage() {
 
       {/* 2-col row: Cache + Outcomes */}
       <CollapsibleSection id="obs-cache-outcomes" title="Session Health" defaultOpen>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 [&>*]:h-full auto-rows-fr">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 *:h-full auto-rows-fr">
           <CacheEfficiencyCard range={range} />
           <SessionOutcomesCard range={range} />
         </div>
@@ -52,7 +52,7 @@ export default function ObservabilityPage() {
 
       {/* 2-col row: Tool Latency + Hook Activity */}
       <CollapsibleSection id="obs-latency-hooks" title="Tool & Hook Performance" defaultOpen>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 [&>*]:h-full auto-rows-fr">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 *:h-full auto-rows-fr">
           <ToolLatencyCard range={range} />
           <HookActivityCard range={range} />
         </div>

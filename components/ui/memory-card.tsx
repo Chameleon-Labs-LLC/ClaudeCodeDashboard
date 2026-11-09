@@ -38,11 +38,11 @@ export default function MemoryCard({ memory }: MemoryCardProps) {
       </div>
 
       <div className={`px-4 pb-4 ${expanded ? '' : 'max-h-32 overflow-hidden relative'}`}>
-        <div className="bg-brand-navy-dark/50 rounded p-3">
+        <div className="bg-brand-navy-dark/50 rounded-sm p-3">
           <Markdown content={expanded || !isLong ? memory.content : memory.content.slice(0, 200) + '...'} />
         </div>
         {!expanded && isLong && (
-          <div className="absolute bottom-4 left-4 right-4 h-12 bg-gradient-to-t from-brand-navy-light/50 to-transparent pointer-events-none rounded-b" />
+          <div className="absolute bottom-4 left-4 right-4 h-12 bg-linear-to-t from-brand-navy-light/50 to-transparent pointer-events-none rounded-b" />
         )}
       </div>
 
