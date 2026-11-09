@@ -53,7 +53,7 @@ export function LiveSessionDetailSheet({ row, onClose }: Props) {
               {row.projectName} · {state?.cwd ?? row.cwd ?? ''} · {state?.model ?? row.model ?? 'unknown'}
             </p>
           </div>
-          <button onClick={onClose} className="rounded p-1 text-zinc-400 hover:bg-brand-navy-dark hover:text-zinc-100">
+          <button onClick={onClose} className="rounded-sm p-1 text-zinc-400 hover:bg-brand-navy-dark hover:text-zinc-100">
             <X size={16} />
           </button>
         </header>
@@ -82,7 +82,7 @@ export function LiveSessionDetailSheet({ row, onClose }: Props) {
                     </span>
                   </div>
                   {e.preview && (
-                    <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] text-zinc-400">
+                    <pre className="mt-1 whitespace-pre-wrap wrap-break-word font-mono text-[11px] text-zinc-400">
                       {e.preview}
                     </pre>
                   )}

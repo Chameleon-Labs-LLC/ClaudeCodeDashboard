@@ -262,7 +262,7 @@ export default function UsagePage() {
                 setSince(daysAgoKey(days));
                 setUntil('');
               }}
-              className="px-2 py-1 text-xs rounded bg-brand-navy-light text-gray-300 hover:text-white hover:border-brand-cyan/30 border border-brand-navy-light/50"
+              className="px-2 py-1 text-xs rounded-sm bg-brand-navy-light text-gray-300 hover:text-white hover:border-brand-cyan/30 border border-brand-navy-light/50"
             >
               {label}
             </button>
@@ -272,7 +272,7 @@ export default function UsagePage() {
               setSince('');
               setUntil('');
             }}
-            className="px-2 py-1 text-xs rounded bg-brand-navy-light text-gray-300 hover:text-white border border-brand-navy-light/50"
+            className="px-2 py-1 text-xs rounded-sm bg-brand-navy-light text-gray-300 hover:text-white border border-brand-navy-light/50"
           >
             All
           </button>
@@ -331,7 +331,7 @@ export default function UsagePage() {
                   setClasses(e.target.checked ? [...classes, c.key] : classes.filter((k) => k !== c.key))
                 }
               />
-              <span className={`inline-block w-2 h-2 rounded-sm ${c.color}`} />
+              <span className={`inline-block w-2 h-2 rounded-xs ${c.color}`} />
               {c.label}
             </label>
           ))}
@@ -378,7 +378,7 @@ export default function UsagePage() {
               >
                 {b.period}
               </button>
-              <div className="flex-1 h-5 bg-brand-navy-dark rounded overflow-hidden flex">
+              <div className="flex-1 h-5 bg-brand-navy-dark rounded-sm overflow-hidden flex">
                 {metric === 'tokens' ? (
                   activeClasses.map((c) => (
                     <div

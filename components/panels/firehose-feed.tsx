@@ -33,11 +33,11 @@ export function FirehoseFeed() {
           value={filter}
           onChange={e => setFilter(e.target.value)}
           placeholder="filter event.name…"
-          className="ml-auto w-48 rounded border border-brand-navy-light bg-brand-navy-dark px-2 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-brand-cyan focus:outline-none"
+          className="ml-auto w-48 rounded-sm border border-brand-navy-light bg-brand-navy-dark px-2 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-brand-cyan focus:outline-hidden"
         />
       </header>
 
-      <div className="max-h-[60vh] overflow-y-auto rounded border border-brand-navy-light bg-brand-navy-dark/40 font-mono text-[11px]">
+      <div className="max-h-[60vh] overflow-y-auto rounded-sm border border-brand-navy-light bg-brand-navy-dark/40 font-mono text-[11px]">
         {shown.length === 0 && (
           <p className="p-3 text-zinc-500">
             {events.length === 0 ? 'Waiting for events…' : 'No events match filter.'}

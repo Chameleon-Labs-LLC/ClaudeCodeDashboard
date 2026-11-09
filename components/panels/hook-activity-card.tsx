@@ -57,10 +57,10 @@ export default function HookActivityCard({ range }: Props) {
 
   if (loading) return (
     <div className="bg-brand-navy-light border border-brand-navy-light/50 rounded-xl p-5 h-full">
-      <div className="h-4 w-32 bg-brand-navy/60 rounded animate-pulse mb-4" />
+      <div className="h-4 w-32 bg-brand-navy/60 rounded-sm animate-pulse mb-4" />
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-10 bg-brand-navy/60 rounded animate-pulse" />
+          <div key={i} className="h-10 bg-brand-navy/60 rounded-sm animate-pulse" />
         ))}
       </div>
     </div>
@@ -97,7 +97,7 @@ export default function HookActivityCard({ range }: Props) {
           <p className="text-gray-600 text-xs text-center max-w-xs">
             Hook events appear here when Claude Code runs pre/post-tool hooks.
             Configure hooks in{' '}
-            <code className="text-chameleon-amber bg-brand-navy-dark px-1 rounded">
+            <code className="text-chameleon-amber bg-brand-navy-dark px-1 rounded-sm">
               ~/.claude/settings.json
             </code>
           </p>

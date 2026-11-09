@@ -53,7 +53,7 @@ export function LiveSessionsCard() {
             <li key={r.id}>
               <button
                 onClick={() => setSelected(r)}
-                className="flex w-full items-center justify-between rounded border border-transparent bg-brand-navy-dark/40 px-3 py-2 text-left text-xs transition hover:border-brand-cyan/40 hover:bg-brand-navy-dark"
+                className="flex w-full items-center justify-between rounded-sm border border-transparent bg-brand-navy-dark/40 px-3 py-2 text-left text-xs transition hover:border-brand-cyan/40 hover:bg-brand-navy-dark"
               >
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate font-medium text-zinc-100">{r.title}</span>

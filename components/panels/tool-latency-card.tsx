@@ -42,9 +42,9 @@ export default function ToolLatencyCard({ range }: Props) {
 
   if (loading) return (
     <div className="bg-brand-navy-light border border-brand-navy-light/50 rounded-xl p-5 h-full">
-      <div className="h-4 w-36 bg-brand-navy/60 rounded animate-pulse mb-4" />
+      <div className="h-4 w-36 bg-brand-navy/60 rounded-sm animate-pulse mb-4" />
       <div className="space-y-2">
-        {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-8 bg-brand-navy/60 rounded animate-pulse" />)}
+        {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-8 bg-brand-navy/60 rounded-sm animate-pulse" />)}
       </div>
     </div>
   );

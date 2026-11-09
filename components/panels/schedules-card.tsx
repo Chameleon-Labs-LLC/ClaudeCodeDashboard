@@ -48,8 +48,8 @@ export default function SchedulesCard({ onRefresh }: Props) {
   if (loading) {
     return (
       <div className="space-y-2">
-        <div className="h-12 bg-brand-navy-light/40 rounded animate-pulse" />
-        <div className="h-12 bg-brand-navy-light/40 rounded animate-pulse" />
+        <div className="h-12 bg-brand-navy-light/40 rounded-sm animate-pulse" />
+        <div className="h-12 bg-brand-navy-light/40 rounded-sm animate-pulse" />
       </div>
     );
   }
@@ -76,7 +76,7 @@ export default function SchedulesCard({ onRefresh }: Props) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-white font-medium truncate">{s.name}</span>
-                <code className="text-[10px] text-gray-400 bg-brand-navy/60 px-1.5 py-0.5 rounded">
+                <code className="text-[10px] text-gray-400 bg-brand-navy/60 px-1.5 py-0.5 rounded-sm">
                   {s.cron_expression}
                 </code>
                 {stale && <span title="stale" className="w-2 h-2 rounded-full bg-amber-400" />}

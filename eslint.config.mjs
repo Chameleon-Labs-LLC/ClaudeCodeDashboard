@@ -21,7 +21,6 @@ export default [
       'app/**',
       'lib/claude-*.ts',
       'postcss.config.mjs',
-      'tailwind.config.ts',
       'next.config.js',
     ],
   },

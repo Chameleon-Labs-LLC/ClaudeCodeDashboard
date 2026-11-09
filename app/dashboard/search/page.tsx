@@ -42,7 +42,7 @@ export default function SearchPage() {
           placeholder="Search sessions, memory, projects... (press / to focus)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 max-w-lg px-4 py-2.5 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-none focus:border-brand-cyan/40"
+          className="flex-1 max-w-lg px-4 py-2.5 bg-brand-navy-dark border border-brand-navy-light/30 rounded-lg text-white text-sm placeholder:text-gray-500 focus:outline-hidden focus:border-brand-cyan/40"
         />
         <button
           type="submit"

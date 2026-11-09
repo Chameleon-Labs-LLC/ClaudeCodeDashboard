@@ -53,9 +53,9 @@ export default function ToolsPage() {
             <span className="text-gray-300 text-xs w-40 shrink-0 truncate" title={tool.tool}>
               {tool.tool}
             </span>
-            <div className="flex-1 h-6 bg-brand-navy-dark rounded overflow-hidden">
+            <div className="flex-1 h-6 bg-brand-navy-dark rounded-sm overflow-hidden">
               <div
-                className="h-full bg-brand-cyan/60 rounded flex items-center"
+                className="h-full bg-brand-cyan/60 rounded-sm flex items-center"
                 style={{ width: `${(tool.count / maxCount) * 100}%`, minWidth: '2px' }}
               >
                 <span className="text-xs text-white px-2 whitespace-nowrap">{fmt(tool.count)}</span>
