@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-09
+
+### Added
+- MIT `LICENSE` file.
+- `security` workflow: gitleaks over the commits each PR or push introduces (full history on a weekly timer) and osv-scanner over every manifest, lockfile and pinned workflow action. Both scanners are installed from checksum-verified release binaries, downloaded outside the checkout.
+- Dependabot for npm and GitHub Actions, with grouped security updates and a 7-day cooldown on version updates. GitHub Actions may have two update PRs open, so a major-version update never blocks the weekly group.
+
 ## [0.6.0] - 2026-11-09
 
 ### Security
