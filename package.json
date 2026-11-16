@@ -18,7 +18,7 @@
     "pricing:refresh": "tsx scripts/refresh-pricing.ts"
   },
   "dependencies": {
-    "@tailwindcss/postcss": "^4.3.4",
+    "@tailwindcss/postcss": "^4.3.5",
     "@tailwindcss/typography": "^0.5",
     "better-sqlite3": "^11.10.0",
     "fuse.js": "^7.5.0",
