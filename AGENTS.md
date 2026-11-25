@@ -22,4 +22,5 @@ Local Next.js dashboard for Claude Code. It reads `~/.claude/` directly, keeps d
 
 ## Pointers
 
-- Docs and notes: `Docs/`, `Notes/`.
+- Docs: `Docs/` (start with `Docs/Claude-Code-Field-Guide.md`).
+- The default branch is `master`. Branch from `origin/master` and review against it (`--base origin/master`); the global examples show `origin/main`.
